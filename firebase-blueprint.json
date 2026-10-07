@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered SafeScan user account with role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["senior", "caregiver", "admin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role", "createdAt"]
+    },
+    "SeniorProfile": {
+      "title": "SeniorProfile",
+      "description": "Emergency identification profile for senior citizen",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "safeScanId": { "type": "string", "maxLength": 50 },
+        "patientId": { "type": "string", "maxLength": 50 },
+        "qrId": { "type": "string", "maxLength": 50 },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "dateOfBirth": { "type": "string", "maxLength": 20 },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "maxLength": 20 },
+        "photoUrl": { "type": "string", "maxLength": 250000 },
+        "bloodGroup": { "type": "string", "maxLength": 10 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "address": { "type": "string", "maxLength": 250 },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 100 },
+        "pincode": { "type": "string", "maxLength": 20 },
+        "medicalConditions": { "type": "string", "maxLength": 1000 },
+        "allergies": { "type": "string", "maxLength": 1000 },
+        "medications": { "type": "string", "maxLength": 1000 },
+        "emergencyInstructions": { "type": "string", "maxLength": 1500 },
+        "mobilityAssistance": { "type": "string", "maxLength": 500 },
+        "communicationDifficulties": { "type": "string", "maxLength": 500 },
+        "identificationMarks": { "type": "string", "maxLength": 500 },
+        "languagesSpoken": { "type": "string", "maxLength": 200 },
+        "primaryContactName": { "type": "string", "maxLength": 100 },
+        "primaryContactRelation": { "type": "string", "maxLength": 50 },
+        "primaryContactPhone": { "type": "string", "maxLength": 20 },
+        "secondaryContactName": { "type": "string", "maxLength": 100 },
+        "secondaryContactRelation": { "type": "string", "maxLength": 50 },
+        "secondaryContactPhone": { "type": "string", "maxLength": 20 },
+        "preferredHospital": { "type": "string", "maxLength": 200 },
+        "doctorName": { "type": "string", "maxLength": 100 },
+        "doctorContact": { "type": "string", "maxLength": 20 },
+        "qrToken": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["active", "disabled"] },
+        "isDemo": { "type": "boolean" },
+        "publicVisibility": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "fullName", "bloodGroup", "primaryContactName", "primaryContactPhone", "qrToken", "status"]
+    },
+    "EmergencyReport": {
+      "title": "EmergencyReport",
+      "description": "Incident report submitted when a senior is found in distress",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "seniorId": { "type": "string" },
+        "seniorName": { "type": "string", "maxLength": 100 },
+        "reporterName": { "type": "string", "maxLength": 100 },
+        "reporterPhone": { "type": "string", "maxLength": 30 },
+        "message": { "type": "string", "maxLength": 1000 },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "accuracy": { "type": "number" },
+        "locationAddress": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["pending", "contacted", "resolved"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "seniorId", "message", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User accounts profile and role"
+    },
+    "/senior_profiles/{profileId}": {
+      "schema": { "$ref": "#/entities/SeniorProfile" },
+      "description": "Senior citizen emergency identification records"
+    },
+    "/emergency_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/EmergencyReport" },
+      "description": "Emergency reports filed by bystanders"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Collection designating platform administrator UIDs"
+    }
+  }
+}

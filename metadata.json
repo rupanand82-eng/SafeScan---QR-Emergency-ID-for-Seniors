@@ -1,0 +1,11 @@
+{
+  "name": "Remix SafeScan - QR Emergency ID for Seniors",
+  "description": "QR-based emergency identification system for senior citizens to provide critical medical and contact information in emergencies.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'rupanand82@gmail.com' && request.auth.token.email_verified == true) ||
+        (request.auth.token.email == 'rupanandpalakurthi@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // Admin collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+        incoming().id == userId &&
+        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().email is string && incoming().email.size() <= 150 &&
+        incoming().role in ['senior', 'caregiver', 'admin'];
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin()) &&
+        incoming().id == userId &&
+        incoming().name is string && incoming().name.size() <= 100 &&
+        incoming().email is string && incoming().email.size() <= 150 &&
+        incoming().role in ['senior', 'caregiver', 'admin'];
+      allow delete: if isAdmin();
+    }
+
+    // Senior Profiles collection - PUBLIC EMERGENCY IDENTIFICATION ACCESS
+    match /senior_profiles/{profileId} {
+      // Emergency QR profiles can be fetched by ID or queried by safeScanId without login
+      allow read: if true;
+
+      // Allow creating senior emergency profile
+      allow create: if isValidId(profileId) &&
+        incoming().fullName is string && incoming().fullName.size() > 0 && incoming().fullName.size() <= 100 &&
+        incoming().bloodGroup is string && incoming().bloodGroup.size() <= 10 &&
+        incoming().primaryContactName is string && incoming().primaryContactName.size() <= 100 &&
+        incoming().primaryContactPhone is string && incoming().primaryContactPhone.size() <= 30 &&
+        incoming().status in ['active', 'disabled'];
+
+      // Allow updating and deleting
+      allow update: if isValidId(profileId);
+      allow delete: if isValidId(profileId);
+    }
+
+    // Emergency Reports
+    match /emergency_reports/{reportId} {
+      // Anyone can file an emergency report to help a senior citizen in distress
+      allow create: if isValidId(reportId) &&
+        incoming().seniorId is string && incoming().seniorId.size() > 0 &&
+        incoming().message is string && incoming().message.size() > 0 && incoming().message.size() <= 1000;
+
+      // Reports can be read by responders, families, and administrators
+      allow read: if true;
+
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+  }
+}
