@@ -213,6 +213,7 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
                       <th className="py-3 px-4">Age / Blood</th>
                       <th className="py-3 px-4">Emergency Contact</th>
                       <th className="py-3 px-4">SafeScan ID</th>
+                      <th className="py-3 px-4">Identity Verification</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
@@ -232,6 +233,17 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
                         </td>
                         <td className="py-3 px-4 font-mono text-[11px] text-red-400 font-bold">
                           {s.safeScanId || s.patientId || s.qrToken || s.id}
+                        </td>
+                        <td className="py-3 px-4">
+                          {s.identity_fingerprint || s.identityStatus === 'verified_unique' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
+                              HMAC Verified {s.identityMasked ? `(${s.identityMasked})` : ''}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-700 text-slate-300">
+                              Legacy Unverified
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           <span

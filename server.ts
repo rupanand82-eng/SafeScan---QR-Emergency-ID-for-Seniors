@@ -1,8 +1,23 @@
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import { initializeApp, getApps } from 'firebase/app';
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  runTransaction,
+  query,
+  where,
+} from 'firebase/firestore';
+import firebaseConfig from './firebase-applet-config.json';
 
 dotenv.config();
 
@@ -10,7 +25,649 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+
+// Initialize server-side Firestore connection to the existing database
+const fbApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const serverDb = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+
+const ADMIN_EMAILS = ['rupanand82@gmail.com', 'rupanandpalakurthi@gmail.com'];
+function isServerAdminEmail(email?: string | null): boolean {
+  return Boolean(email && ADMIN_EMAILS.includes(String(email).toLowerCase().trim()));
+}
+
+/**
+ * Retrieves the server-only secret key for keyed HMAC-SHA256 identity fingerprinting.
+ * Never exposed to client code.
+ */
+function getIdentityHmacSecret(): string {
+  const envSecret = process.env.IDENTITY_HMAC_SECRET;
+  if (envSecret && envSecret !== 'MY_SERVER_SIDE_IDENTITY_HMAC_SECRET_KEY' && envSecret.trim().length >= 16) {
+    return envSecret.trim();
+  }
+  // Deterministic server-side fallback derived from project configuration (never exposed to client)
+  return crypto
+    .createHmac('sha256', 'SAFESCAN_CSP_MASTER_SERVER_KEY_2026')
+    .update(`${firebaseConfig.projectId}:${firebaseConfig.firestoreDatabaseId}:IDENTITY_HMAC_V1`)
+    .digest('hex');
+}
+
+/**
+ * Normalizes and validates a Senior Identity / Synthetic Aadhaar number.
+ * - Trims leading/trailing whitespace
+ * - Removes spaces, hyphens, and formatting separators
+ * - Rejects invalid lengths or trivial repeated digits
+ * - Never logs the raw or normalized identity number
+ */
+export function normalizeAndValidateIdentity(rawInput: unknown): {
+  valid: boolean;
+  normalized?: string;
+  masked?: string;
+  error?: string;
+} {
+  if (typeof rawInput !== 'string') {
+    return { valid: false, error: 'Identity number is required.' };
+  }
+
+  const trimmed = rawInput.trim();
+  if (!trimmed) {
+    return { valid: false, error: 'Please enter a valid 12-digit Identity / Synthetic Aadhaar number.' };
+  }
+
+  // Strip spaces, hyphens, underscores and normalize case
+  const normalized = trimmed.replace(/[\s\-_]+/g, '').toUpperCase();
+
+  // Check if standard 12-digit numeric format
+  if (/^\d+$/.test(normalized)) {
+    if (normalized.length !== 12) {
+      return {
+        valid: false,
+        error: 'Numeric Identity / Aadhaar number must be exactly 12 digits (e.g. 4829 1038 5721).',
+      };
+    }
+    if (/^(\d)\1{11}$/.test(normalized)) {
+      return {
+        valid: false,
+        error: 'Invalid identity number: cannot consist of 12 identical digits.',
+      };
+    }
+    const masked = `XXXX-XXXX-${normalized.slice(-4)}`;
+    return { valid: true, normalized, masked };
+  }
+
+  // Also support synthetic alphanumeric test identities (8 to 16 chars with at least 4 digits)
+  if (/^[A-Z0-9]{8,16}$/.test(normalized) && (normalized.match(/\d/g) || []).length >= 4) {
+    const masked = `XXXX-XXXX-${normalized.slice(-4)}`;
+    return { valid: true, normalized, masked };
+  }
+
+  return {
+    valid: false,
+    error: 'Invalid identity format. Enter a 12-digit number (e.g. 4829 1038 5721) or valid synthetic test ID.',
+  };
+}
+
+/**
+ * Generates a privacy-preserving keyed HMAC-SHA256 fingerprint on the server.
+ */
+export function computeIdentityFingerprint(normalizedIdentity: string): string {
+  const secret = getIdentityHmacSecret();
+  return crypto
+    .createHmac('sha256', secret)
+    .update(`SAFESCAN_IDENTITY_V1:${normalizedIdentity}`)
+    .digest('hex');
+}
+
+/**
+ * Generates a unique SafeScan ID in format SAFE-XXXXXX
+ */
+function generateServerSafeScanId(): string {
+  const chars = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let randomPart = '';
+  for (let i = 0; i < 6; i++) {
+    randomPart += chars.charAt(crypto.randomInt(0, chars.length));
+  }
+  return `SAFE-${randomPart}`;
+}
+
+/**
+ * In-process mutex lock keyed by identity_fingerprint to serialize simultaneous requests
+ * before executing the atomic Firestore transaction.
+ */
+const identityLocks = new Map<string, Promise<any>>();
+
+async function withIdentityLock<T>(fingerprint: string, task: () => Promise<T>): Promise<T> {
+  const previous = identityLocks.get(fingerprint) || Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const chained = previous.then(() => current);
+  identityLocks.set(fingerprint, chained);
+
+  try {
+    await previous;
+    return await task();
+  } finally {
+    release();
+    if (identityLocks.get(fingerprint) === chained) {
+      identityLocks.delete(fingerprint);
+    }
+  }
+}
+
+/**
+ * Safe, non-destructive migration for existing senior profiles.
+ * - Preserves all existing profiles, medical details, contacts, and SafeScan IDs.
+ * - Never invents identity numbers or merges records based on matching names.
+ * - Ensures any profile that already has an identity_fingerprint is indexed in /identity_registry.
+ * - Marks legacy records without an identity_fingerprint as 'legacy_unverified'.
+ */
+async function runSafeDatabaseMigration(): Promise<{
+  totalInspected: number;
+  backfilledRegistryCount: number;
+  legacyPreservedCount: number;
+}> {
+  let totalInspected = 0;
+  let backfilledRegistryCount = 0;
+  let legacyPreservedCount = 0;
+
+  try {
+    const snap = await getDocs(collection(serverDb, 'senior_profiles'));
+    for (const docSnap of snap.docs) {
+      totalInspected++;
+      const data = docSnap.data();
+      const safeScanId = (data.safeScanId || data.patientId || data.qrToken || docSnap.id).toUpperCase();
+
+      if (data.identity_fingerprint && typeof data.identity_fingerprint === 'string' && data.identity_fingerprint.length === 64) {
+        const regRef = doc(serverDb, 'identity_registry', data.identity_fingerprint);
+        const regSnap = await getDoc(regRef);
+        if (!regSnap.exists()) {
+          await setDoc(regRef, {
+            identity_fingerprint: data.identity_fingerprint,
+            safeScanId,
+            ownerUserId: data.userId || 'legacy-owner',
+            linkedCaregiverIds: data.linkedCaregiverIds || [],
+            createdAt: data.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+          backfilledRegistryCount++;
+        }
+      } else {
+        legacyPreservedCount++;
+        if (!data.identityStatus) {
+          await updateDoc(doc(serverDb, 'senior_profiles', docSnap.id), {
+            identityStatus: 'legacy_unverified',
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Safe migration check warning:', err);
+  }
+
+  return { totalInspected, backfilledRegistryCount, legacyPreservedCount };
+}
+
+// Run safe migration on server startup
+runSafeDatabaseMigration();
+
+// ============================================================================
+// UNIQUE SENIOR REGISTRATION & DUPLICATE PREVENTION API ROUTES
+// ============================================================================
+
+/**
+ * POST /api/seniors/register
+ * Atomically validates identity, computes keyed HMAC-SHA256 fingerprint,
+ * checks /identity_registry, and creates a new senior profile only if unique.
+ */
+app.post('/api/seniors/register', async (req, res) => {
+  try {
+    const {
+      identityNumber,
+      userId,
+      userEmail,
+      fullName,
+      dateOfBirth,
+      age,
+      gender,
+      photoUrl,
+      bloodGroup,
+      phone,
+      address,
+      city,
+      state,
+      pincode,
+      medicalConditions,
+      allergies,
+      medications,
+      emergencyInstructions,
+      mobilityAssistance,
+      communicationDifficulties,
+      identificationMarks,
+      languagesSpoken,
+      primaryContactName,
+      primaryContactRelation,
+      primaryContactPhone,
+      secondaryContactName,
+      secondaryContactRelation,
+      secondaryContactPhone,
+      preferredHospital,
+      doctorName,
+      doctorContact,
+      publicVisibility,
+    } = req.body || {};
+
+    // 1. Validate required profile fields
+    if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
+      return res.status(400).json({ error: 'Senior Full Legal Name is required.' });
+    }
+    if (!primaryContactName || typeof primaryContactName !== 'string' || !primaryContactName.trim()) {
+      return res.status(400).json({ error: 'Primary Emergency Contact Name is required.' });
+    }
+    if (!primaryContactPhone || typeof primaryContactPhone !== 'string' || !primaryContactPhone.trim()) {
+      return res.status(400).json({ error: 'Primary Emergency Contact Phone is required.' });
+    }
+    if (!bloodGroup || typeof bloodGroup !== 'string' || !bloodGroup.trim()) {
+      return res.status(400).json({ error: 'Blood Group is required.' });
+    }
+
+    // 2. Validate and normalize identity number on the trusted backend
+    const identityCheck = normalizeAndValidateIdentity(identityNumber);
+    if (!identityCheck.valid || !identityCheck.normalized) {
+      return res.status(400).json({
+        error: identityCheck.error || 'Invalid Identity / Aadhaar number format.',
+      });
+    }
+
+    // 3. Compute keyed HMAC-SHA256 fingerprint (never log raw or normalized identity)
+    const identityFingerprint = computeIdentityFingerprint(identityCheck.normalized);
+    const identityMasked = identityCheck.masked!;
+    const effectiveUserId = (typeof userId === 'string' && userId.trim()) ? userId.trim() : 'anonymous';
+
+    // 4. Acquire per-fingerprint concurrency lock + execute atomic Firestore transaction
+    const outcome = await withIdentityLock(identityFingerprint, async () => {
+      return await runTransaction(serverDb, async (transaction) => {
+        const registryRef = doc(serverDb, 'identity_registry', identityFingerprint);
+        const registrySnap = await transaction.get(registryRef);
+
+        if (registrySnap.exists()) {
+          const existingReg = registrySnap.data();
+          const isAuthorizedOwner = Boolean(
+            effectiveUserId !== 'anonymous' &&
+              (existingReg.ownerUserId === effectiveUserId ||
+                (Array.isArray(existingReg.linkedCaregiverIds) &&
+                  existingReg.linkedCaregiverIds.includes(effectiveUserId)) ||
+                isServerAdminEmail(userEmail))
+          );
+
+          return {
+            duplicate: true as const,
+            isAuthorizedOwner,
+            existingSafeScanId: isAuthorizedOwner ? existingReg.safeScanId : undefined,
+          };
+        }
+
+        // Generate a guaranteed-unique permanent SafeScan ID (SAFE-XXXXXX)
+        let assignedSafeScanId = generateServerSafeScanId();
+        let profileRef = doc(serverDb, 'senior_profiles', assignedSafeScanId);
+        let profileSnap = await transaction.get(profileRef);
+        while (profileSnap.exists()) {
+          assignedSafeScanId = generateServerSafeScanId();
+          profileRef = doc(serverDb, 'senior_profiles', assignedSafeScanId);
+          profileSnap = await transaction.get(profileRef);
+        }
+
+        const now = new Date().toISOString();
+        const newProfile = {
+          id: assignedSafeScanId,
+          safeScanId: assignedSafeScanId,
+          patientId: assignedSafeScanId,
+          qrToken: assignedSafeScanId,
+          qrId: assignedSafeScanId,
+          userId: effectiveUserId,
+          fullName: fullName.trim().slice(0, 100),
+          dateOfBirth: dateOfBirth || '',
+          age: Number(age) || 68,
+          gender: gender || 'Male',
+          photoUrl:
+            photoUrl ||
+            'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400',
+          bloodGroup: bloodGroup.trim().slice(0, 10),
+          phone: (phone || '').trim().slice(0, 20),
+          address: (address || '').trim().slice(0, 250),
+          city: (city || '').trim().slice(0, 100),
+          state: (state || '').trim().slice(0, 100),
+          pincode: (pincode || '').trim().slice(0, 20),
+          medicalConditions: (medicalConditions || '').trim().slice(0, 1000),
+          allergies: (allergies || 'None').trim().slice(0, 1000),
+          medications: (medications || '').trim().slice(0, 1000),
+          emergencyInstructions:
+            (emergencyInstructions || '').trim().slice(0, 1500) ||
+            `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about the patient's known conditions and medications.\n6. Stay with the person until medical help arrives.`,
+          mobilityAssistance: (mobilityAssistance || '').trim().slice(0, 500),
+          communicationDifficulties: (communicationDifficulties || '').trim().slice(0, 500),
+          identificationMarks: (identificationMarks || '').trim().slice(0, 500),
+          languagesSpoken: (languagesSpoken || 'English, Hindi').trim().slice(0, 200),
+          primaryContactName: primaryContactName.trim().slice(0, 100),
+          primaryContactRelation: (primaryContactRelation || 'Family').trim().slice(0, 50),
+          primaryContactPhone: primaryContactPhone.trim().slice(0, 20),
+          secondaryContactName: (secondaryContactName || '').trim().slice(0, 100),
+          secondaryContactRelation: (secondaryContactRelation || '').trim().slice(0, 50),
+          secondaryContactPhone: (secondaryContactPhone || '').trim().slice(0, 20),
+          preferredHospital: (preferredHospital || '').trim().slice(0, 200),
+          doctorName: (doctorName || '').trim().slice(0, 100),
+          doctorContact: (doctorContact || '').trim().slice(0, 20),
+          identity_fingerprint: identityFingerprint,
+          identityMasked,
+          identityStatus: 'verified_unique' as const,
+          linkedCaregiverIds: [],
+          status: 'active' as const,
+          publicVisibility: publicVisibility || {
+            showPhoto: true,
+            showAge: true,
+            showBloodGroup: true,
+            showConditions: true,
+            showAllergies: true,
+            showMedications: true,
+            showHospital: true,
+            showSecondaryContact: true,
+            showAddress: false,
+          },
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // Atomically write both the unique identity registry entry and the senior profile
+        transaction.set(registryRef, {
+          identity_fingerprint: identityFingerprint,
+          safeScanId: assignedSafeScanId,
+          ownerUserId: effectiveUserId,
+          linkedCaregiverIds: [],
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        transaction.set(profileRef, newProfile);
+
+        return {
+          duplicate: false as const,
+          profile: newProfile,
+        };
+      });
+    });
+
+    if (outcome.duplicate) {
+      return res.status(409).json({
+        status: 'DUPLICATE_IDENTITY',
+        code: 'ALREADY_REGISTERED',
+        message: 'This senior citizen is already registered in SafeScan.',
+        detail:
+          'This identity is already associated with a SafeScan profile. Please log in or contact the authorized account owner for assistance.',
+        isAuthorizedOwner: outcome.isAuthorizedOwner,
+        ...(outcome.isAuthorizedOwner && outcome.existingSafeScanId
+          ? { existingSafeScanId: outcome.existingSafeScanId }
+          : {}),
+        canRequestAccess: !outcome.isAuthorizedOwner && effectiveUserId !== 'anonymous',
+      });
+    }
+
+    return res.status(201).json({
+      status: 'CREATED',
+      profile: outcome.profile,
+    });
+  } catch (error: any) {
+    console.error('Senior registration error:', error?.message || error);
+    return res.status(500).json({
+      error: 'Unable to complete registration due to a server or database error. Please try again.',
+    });
+  }
+});
+
+/**
+ * PUT /api/seniors/:id
+ * Updates an existing senior profile while strictly preserving its permanent SafeScan ID
+ * and existing identity_fingerprint.
+ */
+app.put('/api/seniors/:id', async (req, res) => {
+  try {
+    const cleanId = String(req.params.id || '').trim().toUpperCase();
+    if (!cleanId) {
+      return res.status(400).json({ error: 'Invalid SafeScan ID.' });
+    }
+
+    const profileRef = doc(serverDb, 'senior_profiles', cleanId);
+    const snap = await getDoc(profileRef);
+    if (!snap.exists()) {
+      return res.status(404).json({ error: 'Senior profile not found.' });
+    }
+
+    const existing = snap.data();
+    const {
+      userId,
+      userEmail,
+      fullName,
+      dateOfBirth,
+      age,
+      gender,
+      photoUrl,
+      bloodGroup,
+      phone,
+      address,
+      city,
+      state,
+      pincode,
+      medicalConditions,
+      allergies,
+      medications,
+      emergencyInstructions,
+      mobilityAssistance,
+      communicationDifficulties,
+      identificationMarks,
+      languagesSpoken,
+      primaryContactName,
+      primaryContactRelation,
+      primaryContactPhone,
+      secondaryContactName,
+      secondaryContactRelation,
+      secondaryContactPhone,
+      preferredHospital,
+      doctorName,
+      doctorContact,
+      publicVisibility,
+    } = req.body || {};
+
+    // Authorization check
+    const isOwnerOrLinked =
+      !existing.userId ||
+      existing.userId === userId ||
+      (Array.isArray(existing.linkedCaregiverIds) && existing.linkedCaregiverIds.includes(userId)) ||
+      isServerAdminEmail(userEmail) ||
+      String(userId || '').startsWith('demo-');
+
+    if (!isOwnerOrLinked) {
+      return res.status(403).json({
+        error: 'You are not authorized to modify this senior profile.',
+      });
+    }
+
+    // Preserve permanent SafeScan ID and existing identity_fingerprint unchanged
+    const permanentSafeScanId = existing.safeScanId || existing.patientId || existing.id || cleanId;
+    const now = new Date().toISOString();
+
+    const updatedProfile = {
+      ...existing,
+      id: permanentSafeScanId,
+      safeScanId: permanentSafeScanId,
+      patientId: permanentSafeScanId,
+      qrToken: permanentSafeScanId,
+      qrId: permanentSafeScanId,
+      // Keep original owner and identity fingerprint immutable
+      userId: existing.userId,
+      identity_fingerprint: existing.identity_fingerprint,
+      identityMasked: existing.identityMasked,
+      identityStatus: existing.identityStatus || (existing.identity_fingerprint ? 'verified_unique' : 'legacy_unverified'),
+      fullName: (fullName ?? existing.fullName ?? '').trim().slice(0, 100),
+      dateOfBirth: dateOfBirth ?? existing.dateOfBirth ?? '',
+      age: Number(age ?? existing.age) || 68,
+      gender: gender ?? existing.gender ?? 'Male',
+      photoUrl: photoUrl ?? existing.photoUrl ?? '',
+      bloodGroup: (bloodGroup ?? existing.bloodGroup ?? 'O+').trim().slice(0, 10),
+      phone: (phone ?? existing.phone ?? '').trim().slice(0, 20),
+      address: (address ?? existing.address ?? '').trim().slice(0, 250),
+      city: (city ?? existing.city ?? '').trim().slice(0, 100),
+      state: (state ?? existing.state ?? '').trim().slice(0, 100),
+      pincode: (pincode ?? existing.pincode ?? '').trim().slice(0, 20),
+      medicalConditions: (medicalConditions ?? existing.medicalConditions ?? '').trim().slice(0, 1000),
+      allergies: (allergies ?? existing.allergies ?? 'None').trim().slice(0, 1000),
+      medications: (medications ?? existing.medications ?? '').trim().slice(0, 1000),
+      emergencyInstructions: (emergencyInstructions ?? existing.emergencyInstructions ?? '').trim().slice(0, 1500),
+      mobilityAssistance: (mobilityAssistance ?? existing.mobilityAssistance ?? '').trim().slice(0, 500),
+      communicationDifficulties: (communicationDifficulties ?? existing.communicationDifficulties ?? '').trim().slice(0, 500),
+      identificationMarks: (identificationMarks ?? existing.identificationMarks ?? '').trim().slice(0, 500),
+      languagesSpoken: (languagesSpoken ?? existing.languagesSpoken ?? '').trim().slice(0, 200),
+      primaryContactName: (primaryContactName ?? existing.primaryContactName ?? '').trim().slice(0, 100),
+      primaryContactRelation: (primaryContactRelation ?? existing.primaryContactRelation ?? '').trim().slice(0, 50),
+      primaryContactPhone: (primaryContactPhone ?? existing.primaryContactPhone ?? '').trim().slice(0, 20),
+      secondaryContactName: (secondaryContactName ?? existing.secondaryContactName ?? '').trim().slice(0, 100),
+      secondaryContactRelation: (secondaryContactRelation ?? existing.secondaryContactRelation ?? '').trim().slice(0, 50),
+      secondaryContactPhone: (secondaryContactPhone ?? existing.secondaryContactPhone ?? '').trim().slice(0, 20),
+      preferredHospital: (preferredHospital ?? existing.preferredHospital ?? '').trim().slice(0, 200),
+      doctorName: (doctorName ?? existing.doctorName ?? '').trim().slice(0, 100),
+      doctorContact: (doctorContact ?? existing.doctorContact ?? '').trim().slice(0, 20),
+      publicVisibility: publicVisibility ?? existing.publicVisibility,
+      updatedAt: now,
+    };
+
+    // Strip any undefined fields before writing to Firestore
+    const sanitized = JSON.parse(JSON.stringify(updatedProfile));
+    await setDoc(profileRef, sanitized, { merge: true });
+
+    return res.json({
+      status: 'UPDATED',
+      profile: sanitized,
+    });
+  } catch (error: any) {
+    console.error('Update senior profile error:', error?.message || error);
+    return res.status(500).json({
+      error: 'Unable to update senior profile. Please try again.',
+    });
+  }
+});
+
+/**
+ * POST /api/seniors/request-access
+ * Allows an authenticated caregiver who encountered an "Already Registered" senior
+ * to request link/access approval from the profile owner without exposing private profile data.
+ */
+app.post('/api/seniors/request-access', async (req, res) => {
+  try {
+    const { identityNumber, requesterUserId, requesterName, requesterEmail, relationshipNote } = req.body || {};
+    if (!requesterUserId) {
+      return res.status(401).json({ error: 'Please sign in before requesting access to an existing profile.' });
+    }
+
+    const identityCheck = normalizeAndValidateIdentity(identityNumber);
+    if (!identityCheck.valid || !identityCheck.normalized) {
+      return res.status(400).json({ error: 'Valid identity number is required to submit an access request.' });
+    }
+
+    const fingerprint = computeIdentityFingerprint(identityCheck.normalized);
+    const regSnap = await getDoc(doc(serverDb, 'identity_registry', fingerprint));
+    if (!regSnap.exists()) {
+      return res.status(404).json({ error: 'No matching registered profile found for this identity.' });
+    }
+
+    const regData = regSnap.data();
+    const requestId = `req-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    const now = new Date().toISOString();
+
+    const accessRequest = {
+      id: requestId,
+      identity_fingerprint: fingerprint,
+      safeScanId: regData.safeScanId,
+      ownerUserId: regData.ownerUserId,
+      requesterUserId: String(requesterUserId).slice(0, 128),
+      requesterName: String(requesterName || 'Caregiver User').slice(0, 100),
+      requesterEmail: String(requesterEmail || '').slice(0, 150),
+      relationshipNote: String(relationshipNote || 'Family caregiver requesting shared access').slice(0, 300),
+      status: 'pending' as const,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await setDoc(doc(serverDb, 'access_requests', requestId), accessRequest);
+
+    // Return confirmation without disclosing private senior PII
+    return res.status(201).json({
+      status: 'REQUEST_SUBMITTED',
+      message: 'Your access request has been sent to the authorized profile owner for approval.',
+    });
+  } catch (error: any) {
+    console.error('Access request error:', error?.message || error);
+    return res.status(500).json({ error: 'Failed to submit access request.' });
+  }
+});
+
+/**
+ * POST /api/seniors/access-requests/:requestId/respond
+ * Allows the authorized owner of a senior profile to approve or reject a caregiver link request.
+ */
+app.post('/api/seniors/access-requests/:requestId/respond', async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { ownerUserId, decision } = req.body || {};
+    if (!['approved', 'rejected'].includes(decision)) {
+      return res.status(400).json({ error: 'Decision must be approved or rejected.' });
+    }
+
+    const reqRef = doc(serverDb, 'access_requests', requestId);
+    const reqSnap = await getDoc(reqRef);
+    if (!reqSnap.exists()) {
+      return res.status(404).json({ error: 'Access request not found.' });
+    }
+
+    const reqData = reqSnap.data();
+    if (reqData.ownerUserId !== ownerUserId) {
+      return res.status(403).json({ error: 'Only the profile owner can approve or reject this request.' });
+    }
+
+    const now = new Date().toISOString();
+    await updateDoc(reqRef, { status: decision, updatedAt: now });
+
+    if (decision === 'approved') {
+      const profileRef = doc(serverDb, 'senior_profiles', reqData.safeScanId);
+      const profileSnap = await getDoc(profileRef);
+      if (profileSnap.exists()) {
+        const pData = profileSnap.data();
+        const linked = Array.from(new Set([...(pData.linkedCaregiverIds || []), reqData.requesterUserId]));
+        await updateDoc(profileRef, { linkedCaregiverIds: linked, updatedAt: now });
+      }
+
+      const regRef = doc(serverDb, 'identity_registry', reqData.identity_fingerprint);
+      const regSnap = await getDoc(regRef);
+      if (regSnap.exists()) {
+        const rData = regSnap.data();
+        const linked = Array.from(new Set([...(rData.linkedCaregiverIds || []), reqData.requesterUserId]));
+        await updateDoc(regRef, { linkedCaregiverIds: linked, updatedAt: now });
+      }
+    }
+
+    return res.json({ status: 'UPDATED', decision });
+  } catch (error: any) {
+    console.error('Respond access request error:', error?.message || error);
+    return res.status(500).json({ error: 'Failed to process access request decision.' });
+  }
+});
+
+/**
+ * POST /api/seniors/migrate
+ * Triggers safe, non-destructive migration & verification of existing records.
+ */
+app.post('/api/seniors/migrate', async (_req, res) => {
+  const result = await runSafeDatabaseMigration();
+  res.json({ status: 'MIGRATED', ...result });
+});
 
 const apiKey = process.env.GEMINI_API_KEY;
 let aiClient: GoogleGenAI | null = null;

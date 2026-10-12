@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { SeniorProfile, EmergencyReport } from '../types';
+import { SeniorProfile, EmergencyReport, CaregiverAccessRequest } from '../types';
 import { useAuth } from '../context/AuthContext';
 import {
   getSeniorsByUserId,
@@ -7,6 +7,8 @@ import {
   deleteSeniorProfile,
   cleanupDemoProfiles,
   getEmergencyReports,
+  getAccessRequestsForOwner,
+  respondToCaregiverAccessRequest,
 } from '../services/seniorService';
 import { QRDisplayModal } from '../components/QRDisplayModal';
 import { EmergencyCard } from '../components/EmergencyCard';
@@ -26,12 +28,17 @@ import {
   ShieldAlert,
   Sparkles,
   Search,
+  Fingerprint,
+  UserPlus,
+  Check,
+  X,
 } from 'lucide-react';
 
 export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const { userAccount, role } = useAuth();
   const [seniors, setSeniors] = useState<SeniorProfile[]>([]);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const [accessRequests, setAccessRequests] = useState<CaregiverAccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -43,17 +50,16 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
     try {
       setLoading(true);
       await cleanupDemoProfiles();
-      const userId = userAccount?.id;
-      let list: SeniorProfile[] = [];
-      if (userId) {
-        list = await getSeniorsByUserId(userId);
-      } else {
-        list = await getSeniorsByUserId('demo-caregiver-user-id');
-      }
+      const userId = userAccount?.id || 'demo-caregiver-user-id';
+      const list = await getSeniorsByUserId(userId);
       setSeniors((list || []).filter((s) => !s.isDemo));
 
-      const allReports = await getEmergencyReports();
+      const [allReports, pendingReqs] = await Promise.all([
+        getEmergencyReports(),
+        getAccessRequestsForOwner(userId),
+      ]);
       setReports(allReports || []);
+      setAccessRequests(pendingReqs || []);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     } finally {
@@ -64,6 +70,19 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
   useEffect(() => {
     loadData();
   }, [userAccount]);
+
+  const handleRespondAccessRequest = async (
+    reqItem: CaregiverAccessRequest,
+    decision: 'approved' | 'rejected'
+  ) => {
+    const ownerId = userAccount?.id || 'demo-caregiver-user-id';
+    try {
+      await respondToCaregiverAccessRequest(reqItem.id, ownerId, decision);
+      setAccessRequests((prev) => prev.filter((r) => r.id !== reqItem.id));
+    } catch (err) {
+      console.error('Failed to respond to access request:', err);
+    }
+  };
 
   const handleToggleStatus = async (senior: SeniorProfile) => {
     const nextStatus = senior.status === 'active' ? 'disabled' : 'active';
@@ -220,6 +239,59 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
           />
         )}
 
+        {/* Pending Caregiver Access / Link Requests */}
+        {accessRequests.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-amber-700" />
+                <div>
+                  <h2 className="text-sm font-black text-slate-900">
+                    Pending Family Caregiver Link Requests ({accessRequests.length})
+                  </h2>
+                  <p className="text-xs text-slate-600">
+                    Another caregiver attempted to register a senior already under your care and requested shared access.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {accessRequests.map((reqItem) => (
+                <div
+                  key={reqItem.id}
+                  className="p-3.5 rounded-xl bg-white border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                  <div className="space-y-0.5 text-xs">
+                    <div className="font-bold text-slate-900">
+                      {reqItem.requesterName} ({reqItem.requesterEmail || 'Authenticated Caregiver'})
+                    </div>
+                    <div className="text-slate-600">
+                      Profile ID: <strong className="font-mono text-red-600">{reqItem.safeScanId}</strong> • Note: "{reqItem.relationshipNote}"
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <button
+                      onClick={() => handleRespondAccessRequest(reqItem, 'approved')}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Approve Shared Access
+                    </button>
+                    <button
+                      onClick={() => handleRespondAccessRequest(reqItem, 'rejected')}
+                      className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Managed Seniors List */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -277,8 +349,18 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
                     </div>
 
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-extrabold text-slate-900 text-base">{senior.fullName}</h3>
+                        {senior.identity_fingerprint || senior.identityStatus === 'verified_unique' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                            <Fingerprint className="w-3 h-3" />
+                            Verified Unique {senior.identityMasked ? `(${senior.identityMasked})` : ''}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-semibold">
+                            Legacy Profile
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-xs text-slate-500 mt-0.5">

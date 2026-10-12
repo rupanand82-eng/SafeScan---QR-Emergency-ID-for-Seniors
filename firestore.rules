@@ -64,17 +64,60 @@ service cloud.firestore {
       // Emergency QR profiles can be fetched by ID or queried by safeScanId without login
       allow read: if true;
 
-      // Allow creating senior emergency profile
+      // Allow creating senior emergency profile (only if profileId does not already exist)
       allow create: if isValidId(profileId) &&
+        !exists(/databases/$(database)/documents/senior_profiles/$(profileId)) &&
         incoming().fullName is string && incoming().fullName.size() > 0 && incoming().fullName.size() <= 100 &&
         incoming().bloodGroup is string && incoming().bloodGroup.size() <= 10 &&
         incoming().primaryContactName is string && incoming().primaryContactName.size() <= 100 &&
         incoming().primaryContactPhone is string && incoming().primaryContactPhone.size() <= 30 &&
-        incoming().status in ['active', 'disabled'];
+        incoming().status in ['active', 'disabled'] &&
+        (!('identity_fingerprint' in incoming()) || (incoming().identity_fingerprint is string && incoming().identity_fingerprint.size() == 64));
 
-      // Allow updating and deleting
-      allow update: if isValidId(profileId);
+      // Allow updating while strictly preserving safeScanId and identity_fingerprint immutability
+      allow update: if isValidId(profileId) &&
+        (!('safeScanId' in existing()) || incoming().safeScanId == existing().safeScanId) &&
+        (!('identity_fingerprint' in existing()) || existing().identity_fingerprint == null || incoming().identity_fingerprint == existing().identity_fingerprint);
+
       allow delete: if isValidId(profileId);
+    }
+
+    // Unique Identity Fingerprint Registry (Database-level uniqueness constraint)
+    match /identity_registry/{fingerprintId} {
+      // Allow exact document lookup by 64-char HMAC fingerprint; forbid unauthenticated bulk listing to prevent enumeration
+      allow get: if isValidId(fingerprintId) && fingerprintId.size() == 64;
+      allow list: if isAdmin();
+
+      // Strictly enforce uniqueness: cannot overwrite an existing identity_registry document on create
+      allow create: if isValidId(fingerprintId) &&
+        fingerprintId.size() == 64 &&
+        !exists(/databases/$(database)/documents/identity_registry/$(fingerprintId)) &&
+        incoming().identity_fingerprint == fingerprintId &&
+        incoming().safeScanId is string && incoming().safeScanId.size() > 0 && incoming().safeScanId.size() <= 50 &&
+        incoming().ownerUserId is string && incoming().ownerUserId.size() > 0;
+
+      // Preserve immutable identity_fingerprint and safeScanId mapping
+      allow update: if isValidId(fingerprintId) &&
+        incoming().identity_fingerprint == existing().identity_fingerprint &&
+        incoming().safeScanId == existing().safeScanId;
+
+      allow delete: if isValidId(fingerprintId);
+    }
+
+    // Caregiver Access / Link Requests for Existing Profiles
+    match /access_requests/{requestId} {
+      allow read: if true;
+      allow create: if isValidId(requestId) &&
+        incoming().identity_fingerprint is string && incoming().identity_fingerprint.size() == 64 &&
+        incoming().safeScanId is string &&
+        incoming().ownerUserId is string &&
+        incoming().requesterUserId is string &&
+        incoming().status == 'pending';
+      allow update: if isValidId(requestId) &&
+        incoming().identity_fingerprint == existing().identity_fingerprint &&
+        incoming().safeScanId == existing().safeScanId &&
+        incoming().status in ['pending', 'approved', 'rejected'];
+      allow delete: if isValidId(requestId);
     }
 
     // Emergency Reports

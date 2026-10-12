@@ -50,8 +50,12 @@ export interface SeniorProfile {
   doctorName?: string;
   doctorContact?: string;
   
-  // Security & QR
+  // Security, Identity & QR
   qrToken: string;
+  identity_fingerprint?: string; // Server-generated keyed HMAC-SHA256 fingerprint for duplicate prevention
+  identityMasked?: string; // Masked last-4 format (e.g. XXXX-XXXX-4821), never raw Aadhaar
+  identityStatus?: 'verified_unique' | 'legacy_unverified';
+  linkedCaregiverIds?: string[]; // Caregiver UIDs approved by the profile owner
   status: 'active' | 'disabled';
   isDemo?: boolean;
   publicVisibility: {
@@ -67,6 +71,39 @@ export interface SeniorProfile {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface IdentityRegistryEntry {
+  identity_fingerprint: string;
+  safeScanId: string;
+  ownerUserId: string;
+  linkedCaregiverIds?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CaregiverAccessRequest {
+  id: string;
+  identity_fingerprint: string;
+  safeScanId: string;
+  ownerUserId: string;
+  requesterUserId: string;
+  requesterName: string;
+  requesterEmail: string;
+  relationshipNote: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DuplicateRegistrationResponse {
+  status: 'DUPLICATE_IDENTITY';
+  code: 'ALREADY_REGISTERED';
+  message: string;
+  detail: string;
+  isAuthorizedOwner: boolean;
+  existingSafeScanId?: string;
+  canRequestAccess?: boolean;
 }
 
 export interface EmergencyReport {
@@ -97,3 +134,4 @@ export interface TriageGuidance {
   criticalWarnings: string[];
   calmBystanderTip: string;
 }
+

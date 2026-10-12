@@ -53,6 +53,9 @@
         "doctorName": { "type": "string", "maxLength": 100 },
         "doctorContact": { "type": "string", "maxLength": 20 },
         "qrToken": { "type": "string", "maxLength": 64 },
+        "identity_fingerprint": { "type": "string", "maxLength": 64, "minLength": 64 },
+        "identityMasked": { "type": "string", "maxLength": 20 },
+        "identityStatus": { "type": "string", "enum": ["verified_unique", "legacy_unverified"] },
         "status": { "type": "string", "enum": ["active", "disabled"] },
         "isDemo": { "type": "boolean" },
         "publicVisibility": { "type": "string" },
@@ -60,6 +63,38 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "userId", "fullName", "bloodGroup", "primaryContactName", "primaryContactPhone", "qrToken", "status"]
+    },
+    "IdentityRegistry": {
+      "title": "IdentityRegistry",
+      "description": "Unique identity fingerprint index enforcing one senior profile per verified identity",
+      "type": "object",
+      "properties": {
+        "identity_fingerprint": { "type": "string", "maxLength": 64, "minLength": 64 },
+        "safeScanId": { "type": "string", "maxLength": 50 },
+        "ownerUserId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["identity_fingerprint", "safeScanId", "ownerUserId", "createdAt"]
+    },
+    "CaregiverAccessRequest": {
+      "title": "CaregiverAccessRequest",
+      "description": "Access request from a caregiver to link an existing senior profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "identity_fingerprint": { "type": "string", "maxLength": 64 },
+        "safeScanId": { "type": "string", "maxLength": 50 },
+        "ownerUserId": { "type": "string", "maxLength": 128 },
+        "requesterUserId": { "type": "string", "maxLength": 128 },
+        "requesterName": { "type": "string", "maxLength": 100 },
+        "requesterEmail": { "type": "string", "maxLength": 150 },
+        "relationshipNote": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "identity_fingerprint", "safeScanId", "ownerUserId", "requesterUserId", "status", "createdAt"]
     },
     "EmergencyReport": {
       "title": "EmergencyReport",
@@ -90,6 +125,14 @@
     "/senior_profiles/{profileId}": {
       "schema": { "$ref": "#/entities/SeniorProfile" },
       "description": "Senior citizen emergency identification records"
+    },
+    "/identity_registry/{fingerprintId}": {
+      "schema": { "$ref": "#/entities/IdentityRegistry" },
+      "description": "Unique index keyed by HMAC-SHA256 identity_fingerprint to prevent duplicate senior registration"
+    },
+    "/access_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/CaregiverAccessRequest" },
+      "description": "Caregiver requests to link an existing senior profile"
     },
     "/emergency_reports/{reportId}": {
       "schema": { "$ref": "#/entities/EmergencyReport" },

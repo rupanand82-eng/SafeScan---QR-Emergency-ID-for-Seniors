@@ -16,9 +16,12 @@
 - **Select QR Image from Media:** Allows uploading a saved QR code image or screenshot directly from device media files.
 - **Manual SafeScan ID Lookup:** Supports entering a unique SafeScan ID (e.g., `SAFE-XXXXXX`) directly.
 
-### 3. Senior Profile Registration with Media Upload (`/seniors/new`)
+### 3. Unique Senior Registration & Privacy-Preserving Duplicate Prevention (`/seniors/new`)
+- **Keyed HMAC-SHA256 Identity Fingerprinting:** Normalizes the senior's 12-digit Identity / Synthetic Aadhaar number on the backend (`server.ts`) and computes a keyed `HMAC-SHA256` fingerprint (`identity_fingerprint`) using a server-only secret (`IDENTITY_HMAC_SECRET`). Raw identity numbers are never logged, never stored in plaintext, and never exposed in QR codes or URLs.
+- **Database-Enforced Uniqueness & Concurrency Safety:** Uses an in-process per-fingerprint mutex lock combined with an atomic Firestore transaction across `/identity_registry/{identity_fingerprint}` and `/senior_profiles/{safeScanId}` to guarantee that two simultaneous registration attempts for the same senior citizen cannot create duplicate profiles or multiple QR codes.
+- **Privacy-Safe Duplicate Detection Flow:** If a senior is already registered, the system prevents duplicate creation and displays `"This senior citizen is already registered in SafeScan."` Authorized account owners/linked caregivers can directly open or update the existing profile, while other authenticated family caregivers can submit a **Caregiver Access Link Request** without exposing private data.
+- **Immutable Identity on Profile Edits:** Updating a senior's medical conditions, phone number, or emergency contacts via `PUT /api/seniors/:id` strictly preserves their permanent `SafeScan ID` and existing `identity_fingerprint`.
 - **Device Media & Camera Upload:** Upload senior profile photos directly from device gallery/media files (`JPG`, `PNG`, `WEBP`), capture photos with the camera, or link an external image URL with automatic client-side image optimization.
-- **Comprehensive Medical & Care Data:** Records blood group, severe allergies, chronic conditions, regular medications, mobility/communication notes, treating doctor details, and first-responder instructions.
 - **Granular Privacy Controls:** Caregivers choose exactly which fields (photo, age, blood group, allergies, conditions, hospital, residential address) are visible on the public emergency profile.
 
 ### 4. Public Emergency Medical Profile (`/emergency/:id`)
@@ -30,8 +33,8 @@
 
 ### 5. Role-Based Access Control (`/auth`, `/dashboard`, `/admin`)
 - **Google Authentication & Instant Demo Roles:** Supports Firebase Google Sign-In alongside 1-click role testing for **Caregiver**, **Senior Citizen**, and **Administrator** accounts.
-- **Caregiver Dashboard:** Manage registered seniors, toggle QR status (`Active` / `Deactivated` if a badge is lost), print ID cards, and review bystander incident reports.
-- **Administrator Console:** System-wide registry oversight, QR status management, and emergency incident log auditing.
+- **Caregiver Dashboard:** Manage registered seniors, approve/reject family caregiver link requests, toggle QR status (`Active` / `Deactivated` if a badge is lost), print ID cards, and review bystander incident reports.
+- **Administrator Console:** System-wide registry oversight, HMAC identity verification status auditing, QR status management, and emergency incident log auditing.
 - **Senior-Friendly Accessibility:** Includes a global **A+ Large Text** toggle in the navigation bar for elderly readability.
 
 ---
@@ -40,8 +43,8 @@
 
 - **Frontend:** React 19, TypeScript, Tailwind CSS v4, Lucide Icons, Vite
 - **QR Code Engine:** `qrcode` (high-res generation) & `html5-qrcode` (camera & image file scanning)
-- **Backend Server:** Node.js, Express (`server.ts`)
-- **Database & Authentication:** Firebase Authentication (Google Sign-In) & Cloud Firestore (`users`, `senior_profiles`, `emergency_reports`, `admins`)
+- **Backend Server:** Node.js, Express (`server.ts`), Node `crypto` (Keyed `HMAC-SHA256` fingerprinting)
+- **Database & Authentication:** Firebase Authentication (Google Sign-In) & Cloud Firestore (`users`, `senior_profiles`, `identity_registry`, `access_requests`, `emergency_reports`, `admins`)
 
 ---
 
@@ -50,8 +53,8 @@
 ```text
 ├── firebase-applet-config.json   # Firebase project & Firestore database configuration
 ├── firebase-blueprint.json       # Data model schema & Firestore collection definitions
-├── firestore.rules               # Cloud Firestore security rules
-├── server.ts                     # Express full-stack server & API routes
+├── firestore.rules               # Cloud Firestore security & uniqueness rules
+├── server.ts                     # Express full-stack server, HMAC identity fingerprinting & atomic registration API
 ├── src/
 │   ├── App.tsx                   # Application router & layout shell
 │   ├── components/
@@ -71,9 +74,9 @@
 │   │   ├── EmergencyProfilePage.tsx # Public zero-login emergency responder view
 │   │   ├── HomePage.tsx          # Landing page & quick emergency access
 │   │   ├── QRScannerPage.tsx     # Camera, media image & manual ID scanner
-│   │   └── SeniorFormPage.tsx    # Senior profile registration & media photo uploader
+│   │   └── SeniorFormPage.tsx    # Unique senior registration, duplicate conflict UI & media uploader
 │   ├── services/
-│   │   └── seniorService.ts      # Firestore CRUD operations & local caching
+│   │   └── seniorService.ts      # Registration API client, Firestore CRUD & local caching
 │   ├── types/
 │   │   └── index.ts              # TypeScript interfaces
 │   └── utils/
@@ -96,7 +99,7 @@
    ```
 
 2. **Configure environment variables:**
-   Copy `.env.example` to `.env` and set your environment variables if needed:
+   Copy `.env.example` to `.env` and set your environment variables (`GEMINI_API_KEY`, `IDENTITY_HMAC_SECRET`):
    ```bash
    cp .env.example .env
    ```
@@ -116,6 +119,8 @@
 
 ## 🔒 Security & Privacy Notes
 
-- **Public Emergency Read vs. Protected Management:** Senior profiles can be looked up by responders in an emergency, while profile creation, status toggling, and account data are protected via Firestore security rules (`firestore.rules`).
+- **Zero Plaintext Aadhaar Storage:** Raw identity numbers are normalized and converted on the backend into a keyed `HMAC-SHA256` digest (`identity_fingerprint`). Full identity numbers are never stored in Firestore, logged, returned by APIs, or embedded in QR codes.
+- **Non-Destructive Legacy Migration:** Existing senior profiles created prior to unique identity verification are preserved intact (`legacy_unverified`) with their original `SafeScan ID` and QR codes working without interruption.
+- **Public Emergency Read vs. Protected Management:** Senior profiles can be looked up by responders in an emergency, while profile creation, identity uniqueness (`/identity_registry`), status toggling, and account data are protected via Firestore security rules (`firestore.rules`).
 - **Lost Badge Deactivation:** Caregivers and administrators can immediately deactivate a senior's QR code from the dashboard if a physical card or wristband is lost.
 - **Address Privacy:** Residential addresses are hidden from public QR scans by default unless explicitly enabled by the caregiver.

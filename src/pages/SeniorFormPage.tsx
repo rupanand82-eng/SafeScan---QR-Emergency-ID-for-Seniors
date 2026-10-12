@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SeniorProfile } from '../types';
+import { SeniorProfile, DuplicateRegistrationResponse } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { getSeniorProfile, saveSeniorProfile, getNextPatientId, generateSafeScanId } from '../services/seniorService';
+import {
+  getSeniorProfile,
+  getNextPatientId,
+  generateSafeScanId,
+  validateIdentityNumberClient,
+  generateSyntheticTestIdentity,
+  registerUniqueSeniorProfile,
+  updateExistingSeniorProfile,
+  submitCaregiverAccessRequest,
+} from '../services/seniorService';
 import {
   User,
   Heart,
@@ -14,6 +23,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   ShieldAlert,
+  ShieldCheck,
+  Lock,
+  Fingerprint,
+  LogIn,
+  XCircle,
+  UserPlus,
   Upload,
   Camera,
   Image as ImageIcon,
@@ -35,6 +50,19 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
   const [aiEnhancing, setAiEnhancing] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [assignedPatientId, setAssignedPatientId] = useState<string>(seniorId || generateSafeScanId());
+
+  // Unique Identity & Duplicate Prevention State
+  const [identityNumber, setIdentityNumber] = useState('');
+  const [identityError, setIdentityError] = useState<string | null>(null);
+  const [existingIdentityMasked, setExistingIdentityMasked] = useState<string | undefined>(undefined);
+  const [existingIdentityStatus, setExistingIdentityStatus] = useState<
+    'verified_unique' | 'legacy_unverified' | undefined
+  >(undefined);
+  const [duplicateConflict, setDuplicateConflict] = useState<DuplicateRegistrationResponse | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [requestingAccess, setRequestingAccess] = useState(false);
+  const [accessRequestMessage, setAccessRequestMessage] = useState<string | null>(null);
+  const [relationshipNote, setRelationshipNote] = useState('Family caregiver requesting shared access');
 
   // Form State
   const [fullName, setFullName] = useState('');
@@ -99,6 +127,10 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
           const data = await getSeniorProfile(seniorId!);
           if (data) {
             setAssignedPatientId(data.safeScanId || data.patientId || data.id);
+            setExistingIdentityMasked(data.identityMasked);
+            setExistingIdentityStatus(
+              data.identityStatus || (data.identity_fingerprint ? 'verified_unique' : 'legacy_unverified')
+            );
             setFullName(data.fullName);
             setDateOfBirth(data.dateOfBirth || '');
             setAge(data.age || 68);
@@ -162,7 +194,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image media file (JPG, PNG, WEBP, etc.).');
+      setFormError('Please select a valid image media file (JPG, PNG, WEBP, etc.).');
       return;
     }
 
@@ -211,7 +243,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
       img.src = resultDataUrl;
     };
     reader.onerror = () => {
-      alert('Failed to read the selected media file.');
+      setFormError('Failed to read the selected media file.');
       setPhotoUploading(false);
     };
     reader.readAsDataURL(file);
@@ -237,78 +269,152 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
       }
     } catch (e) {
       console.error('AI enhance note error:', e);
-      alert('AI assistant unavailable; please write instructions manually.');
     } finally {
       setAiEnhancing(false);
     }
   };
 
+  const handleIdentityInputChange = (val: string) => {
+    setIdentityNumber(val);
+    setDuplicateConflict(null);
+    setAccessRequestMessage(null);
+    if (!val.trim()) {
+      setIdentityError(null);
+      return;
+    }
+    const validation = validateIdentityNumberClient(val);
+    setIdentityError(validation.valid ? null : validation.error || null);
+  };
+
+  const handleGenerateTestIdentity = () => {
+    const synthetic = generateSyntheticTestIdentity();
+    setIdentityNumber(synthetic);
+    setIdentityError(null);
+    setDuplicateConflict(null);
+    setAccessRequestMessage(null);
+  };
+
+  const handleRequestCaregiverAccess = async () => {
+    if (!userAccount?.id) {
+      navigate('/auth');
+      return;
+    }
+    try {
+      setRequestingAccess(true);
+      setAccessRequestMessage(null);
+      const msg = await submitCaregiverAccessRequest({
+        identityNumber,
+        requesterUserId: userAccount.id,
+        requesterName: userAccount.name,
+        requesterEmail: userAccount.email,
+        relationshipNote,
+      });
+      setAccessRequestMessage(msg);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to submit caregiver access request.');
+    } finally {
+      setRequestingAccess(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    setDuplicateConflict(null);
+    setAccessRequestMessage(null);
+
     if (!fullName.trim() || !primaryContactName.trim() || !primaryContactPhone.trim()) {
-      alert('Please fill out the Senior Full Name and Primary Emergency Contact information.');
+      setFormError('Please fill out the Senior Full Name and Primary Emergency Contact information.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
+    }
+
+    // Validate identity number when registering a new senior
+    if (!isEditing) {
+      const idCheck = validateIdentityNumberClient(identityNumber);
+      if (!idCheck.valid) {
+        setIdentityError(idCheck.error || 'Invalid Identity / Aadhaar number format.');
+        setFormError(idCheck.error || 'Please enter a valid 12-digit Identity / Synthetic Aadhaar number.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
     }
 
     try {
       setSaving(true);
-      const now = new Date().toISOString();
-      const finalPatientId = (assignedPatientId || seniorId || generateSafeScanId()).toUpperCase().trim();
 
-      const profile: SeniorProfile = {
-        id: finalPatientId,
-        safeScanId: finalPatientId,
-        patientId: finalPatientId,
-        qrToken: finalPatientId,
-        qrId: finalPatientId,
-        userId: userAccount?.id || 'demo-user-id',
-        fullName,
+      const commonPayload = {
+        userId: userAccount?.id || 'demo-caregiver-user-id',
+        userEmail: userAccount?.email || '',
+        fullName: fullName.trim(),
         dateOfBirth,
         age: Number(age) || 68,
         gender,
-        photoUrl: photoUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400',
+        photoUrl:
+          photoUrl ||
+          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400',
         bloodGroup,
-        phone,
-        address,
-        city,
-        state,
-        pincode,
-        medicalConditions,
-        allergies: allergies || 'None',
-        medications,
-        emergencyInstructions: emergencyInstructions || `1. Check whether the person is conscious and breathing normally.
-2. Call 112 if the situation is serious.
-3. Do not give food, water, or medicine to an unconscious person.
-4. Keep the person safe and avoid unnecessary movement.
-5. Inform medical professionals about the patient's known conditions and medications.
-6. Stay with the person until medical help arrives.`,
-        mobilityAssistance,
-        communicationDifficulties,
-        identificationMarks,
-        languagesSpoken,
-        primaryContactName,
-        primaryContactRelation,
-        primaryContactPhone,
-        secondaryContactName,
-        secondaryContactRelation,
-        secondaryContactPhone,
-        preferredHospital,
-        doctorName,
-        doctorContact,
-        status: 'active',
+        phone: phone.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        pincode: pincode.trim(),
+        medicalConditions: medicalConditions.trim(),
+        allergies: (allergies || 'None').trim(),
+        medications: medications.trim(),
+        emergencyInstructions:
+          emergencyInstructions.trim() ||
+          `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about the patient's known conditions and medications.\n6. Stay with the person until medical help arrives.`,
+        mobilityAssistance: mobilityAssistance.trim(),
+        communicationDifficulties: communicationDifficulties.trim(),
+        identificationMarks: identificationMarks.trim(),
+        languagesSpoken: languagesSpoken.trim(),
+        primaryContactName: primaryContactName.trim(),
+        primaryContactRelation: primaryContactRelation.trim(),
+        primaryContactPhone: primaryContactPhone.trim(),
+        secondaryContactName: secondaryContactName.trim(),
+        secondaryContactRelation: secondaryContactRelation.trim(),
+        secondaryContactPhone: secondaryContactPhone.trim(),
+        preferredHospital: preferredHospital.trim(),
+        doctorName: doctorName.trim(),
+        doctorContact: doctorContact.trim(),
         publicVisibility,
-        createdAt: now,
-        updatedAt: now,
       };
 
-      await saveSeniorProfile(profile);
+      if (isEditing && seniorId) {
+        // Update existing profile without changing SafeScan ID or regenerating identity_fingerprint
+        const updated = await updateExistingSeniorProfile(seniorId, commonPayload);
+        setAssignedPatientId(updated.safeScanId || updated.id);
+        setSaveSuccess(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1400);
+        return;
+      }
+
+      // New Registration: Server-side HMAC-SHA256 fingerprint & atomic duplicate check
+      const outcome = await registerUniqueSeniorProfile({
+        ...commonPayload,
+        identityNumber,
+      });
+
+      if (outcome.status === 'DUPLICATE_IDENTITY') {
+        setDuplicateConflict(outcome);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      setAssignedPatientId(outcome.profile.safeScanId || outcome.profile.id);
       setSaveSuccess(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
     } catch (err: any) {
       console.error('Save profile error:', err);
-      alert('Failed to save senior profile. Please check connection.');
+      setFormError(err.message || 'Failed to save senior profile. Please check your connection and try again.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
     }
@@ -336,7 +442,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
             Back to Dashboard
           </button>
           <span className="text-xs text-slate-400 font-mono">
-            {isEditing ? `Editing: ${fullName}` : 'New Registration'}
+            {isEditing ? `Editing: ${fullName}` : 'New Unique Senior Registration'}
           </span>
         </div>
 
@@ -352,34 +458,237 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                   {isEditing ? 'Update Patient Emergency Profile' : 'Register Patient Emergency Profile'}
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Saved data is stored in the database and linked to this unique Patient ID.
+                  {isEditing
+                    ? 'Permanent SafeScan ID and verified identity key are preserved across all updates.'
+                    : 'Protected by privacy-preserving HMAC-SHA256 identity fingerprinting to prevent duplicate registrations.'}
                 </p>
               </div>
             </div>
 
             {assignedPatientId && (
               <div className="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white font-mono text-xs font-bold flex items-center gap-2 self-start sm:self-center shadow-sm">
-                <span className="text-slate-400 uppercase text-[10px]">SafeScan ID:</span>
+                <span className="text-slate-400 uppercase text-[10px]">
+                  {isEditing ? 'Permanent SafeScan ID:' : 'Target SafeScan ID:'}
+                </span>
                 <span className="text-red-400 text-sm font-black tracking-wide">{assignedPatientId}</span>
               </div>
             )}
           </div>
         </div>
 
+        {/* DUPLICATE SENIOR REGISTRATION ALERT BANNER */}
+        {duplicateConflict && (
+          <div
+            role="alert"
+            className="rounded-2xl bg-amber-50 border-2 border-amber-400 p-6 shadow-md space-y-4 animate-in fade-in"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 flex-1">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-200/80 text-amber-950">
+                  Duplicate Registration Prevented
+                </span>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900">
+                  {duplicateConflict.message || 'This senior citizen is already registered in SafeScan.'}
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                  {duplicateConflict.detail}
+                </p>
+                <p className="text-[11px] text-amber-900 font-semibold pt-1">
+                  ✓ No duplicate profile or second QR code was created. Full identity details are never exposed.
+                </p>
+              </div>
+            </div>
+
+            {/* Authorized Owner / Caregiver Options vs Unauthorized Options */}
+            <div className="pt-2 border-t border-amber-200/80 flex flex-wrap items-center gap-2.5">
+              {duplicateConflict.isAuthorizedOwner && duplicateConflict.existingSafeScanId && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/emergency/${duplicateConflict.existingSafeScanId}`)}
+                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold shadow-sm transition flex items-center gap-1.5"
+                  >
+                    <Eye className="w-4 h-4" />
+                    View Existing Profile ({duplicateConflict.existingSafeScanId})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/seniors/edit/${duplicateConflict.existingSafeScanId}`)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5"
+                  >
+                    Update Existing Profile
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => navigate('/auth')}
+                className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold shadow-sm transition flex items-center gap-1.5"
+              >
+                <LogIn className="w-4 h-4 text-blue-600" />
+                Go to Login
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="px-4 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <XCircle className="w-4 h-4" />
+                Cancel Registration
+              </button>
+            </div>
+
+            {/* Caregiver Access / Link Request Option when logged into a different caregiver account */}
+            {!duplicateConflict.isAuthorizedOwner && userAccount && (
+              <div className="p-4 rounded-xl bg-white/90 border border-amber-200 space-y-2.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                  <UserPlus className="w-4 h-4 text-blue-600" />
+                  <span>Are you a family member or secondary caregiver for this senior?</span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  For privacy, existing profile details are hidden until approved by the primary account owner. You can send an access link request below:
+                </p>
+                {accessRequestMessage ? (
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>{accessRequestMessage}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <input
+                      type="text"
+                      value={relationshipNote}
+                      onChange={(e) => setRelationshipNote(e.target.value)}
+                      placeholder="Your relationship to the senior (e.g. Daughter / Caregiver)"
+                      className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRequestCaregiverAccess}
+                      disabled={requestingAccess}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      {requestingAccess ? 'Sending Request...' : 'Request Caregiver Access'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {formError && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-center gap-2 text-xs sm:text-sm font-bold">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <span>{formError}</span>
+          </div>
+        )}
+
         {saveSuccess && (
           <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-2 text-sm font-bold animate-in fade-in">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-            <span>Profile and Emergency QR code saved successfully! Redirecting to Dashboard...</span>
+            <span>
+              {isEditing
+                ? `Profile updated! Permanent SafeScan ID (${assignedPatientId}) preserved. Redirecting...`
+                : `Unique Senior Profile & QR Code (${assignedPatientId}) created! Redirecting to Dashboard...`}
+            </span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* 1. PERSONAL INFORMATION */}
+          {/* 1. PERSONAL INFORMATION & UNIQUE IDENTITY VERIFICATION */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <User className="w-5 h-5 text-blue-600" />
-              <h2 className="font-extrabold text-base text-slate-900">1. Personal Information</h2>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-600" />
+                <h2 className="font-extrabold text-base text-slate-900">
+                  1. Personal Information & Unique Identity Verification
+                </h2>
+              </div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold">
+                <Fingerprint className="w-3.5 h-3.5" />
+                HMAC-SHA256 Protected
+              </span>
+            </div>
+
+            {/* Unique Identity Verification Block */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+              {isEditing ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-extrabold text-slate-900 block">
+                        Identity Key & SafeScan ID Locked (Immutable on Edit)
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        {existingIdentityMasked
+                          ? `Verified Identity (${existingIdentityMasked}) • Updating medical or contact details will never change SafeScan ID ${assignedPatientId}.`
+                          : `Legacy Record (${existingIdentityStatus || 'legacy_unverified'}) • Permanent SafeScan ID ${assignedPatientId} is preserved.`}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-mono text-xs font-bold self-start sm:self-center">
+                    {existingIdentityMasked || 'ID LOCKED'}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-blue-600" />
+                      Verified Identity Number (Synthetic Aadhaar / National Senior ID) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateTestIdentity}
+                      className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold transition self-start sm:self-center"
+                    >
+                      + Generate Synthetic Test ID
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter 12-digit synthetic identity number (e.g. 4829 1038 5721)"
+                    value={identityNumber}
+                    onChange={(e) => handleIdentityInputChange(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 text-sm font-mono rounded-xl border bg-white outline-none focus:ring-2 ${
+                      identityError
+                        ? 'border-red-300 focus:ring-red-500 text-red-900'
+                        : 'border-slate-300 focus:ring-blue-500 text-slate-900'
+                    }`}
+                  />
+
+                  {identityError ? (
+                    <p className="text-[11px] text-red-600 font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{identityError}</span>
+                    </p>
+                  ) : identityNumber.trim() && validateIdentityNumberClient(identityNumber).valid ? (
+                    <p className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>
+                        Normalized format verified ({validateIdentityNumberClient(identityNumber).formattedDisplay}). Only a keyed HMAC-SHA256 fingerprint will be stored.
+                      </span>
+                    </p>
+                  ) : null}
+
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    <strong>Privacy Guarantee:</strong> SafeScan never stores your raw Aadhaar/identity number in plaintext and never includes it in QR codes or public URLs. The backend normalizes the input and computes an irreversible keyed <code className="font-mono text-slate-700">HMAC-SHA256</code> fingerprint (<code className="font-mono text-slate-700">identity_fingerprint</code>) solely to prevent duplicate registrations of the same senior citizen. Use synthetic numbers for testing.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -390,7 +699,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Ramesh Chandra Sharma"
+                  placeholder="e.g. Ravi Kumar"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
