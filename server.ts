@@ -17,12 +17,16 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import firebaseConfig from './firebase-applet-config.json';
+import fs from 'fs';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const firebaseConfig = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, 'firebase-applet-config.json'), 'utf-8')
+);
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));
@@ -896,4 +900,8 @@ async function startServer() {
   });
 }
 
-startServer();
+export default app;
+
+if (process.env.VERCEL !== '1') {
+  startServer();
+}

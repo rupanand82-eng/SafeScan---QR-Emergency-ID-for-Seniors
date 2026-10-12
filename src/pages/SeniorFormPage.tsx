@@ -249,7 +249,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
     reader.readAsDataURL(file);
   };
 
-  // AI Note Enhancer Call
+  // AI Note Enhancer Call with offline/static fallback
   const handleEnhanceWithAI = async () => {
     try {
       setAiEnhancing(true);
@@ -263,15 +263,28 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
           customNotes: emergencyInstructions,
         }),
       });
-      const data = await res.json();
-      if (data.enhancedInstructions) {
-        setEmergencyInstructions(data.enhancedInstructions);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.enhancedInstructions) {
+          setEmergencyInstructions(data.enhancedInstructions);
+          return;
+        }
       }
     } catch (e) {
-      console.error('AI enhance note error:', e);
+      console.warn('AI enhance note API unavailable, using structured action notes fallback:', e);
     } finally {
       setAiEnhancing(false);
     }
+
+    // High-visibility first-responder notes fallback
+    const bullets = [
+      `1. Medical Summary: Known conditions: ${medicalConditions || 'Under regular care'}. Blood Group: ${bloodGroup || 'Recorded'}.`,
+      allergies && allergies !== 'None'
+        ? `2. CRITICAL WARNING: Severe allergy to ${allergies}. DO NOT ADMINISTER.`
+        : `2. Immediate Action: Check breathing & responsiveness. Avoid unnecessary movement if a fall is suspected.`,
+      `3. Emergency Contact: Call ${primaryContactName || 'Family'} (${primaryContactPhone || '112'}) immediately. Show medical card to medics.`,
+    ];
+    setEmergencyInstructions(bullets.join('\n'));
   };
 
   const handleIdentityInputChange = (val: string) => {
