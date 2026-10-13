@@ -45,7 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: fbUser.uid,
           name: (fbUser.displayName || 'SafeScan User').slice(0, 100),
           email: (fbUser.email || '').slice(0, 150),
-          role: isDefaultAdmin ? 'admin' : 'caregiver',
+          role: isDefaultAdmin ? 'admin' : 'user',
           createdAt: new Date().toISOString(),
         };
 
@@ -54,12 +54,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const snap = await getDoc(userDocRef);
           if (snap.exists()) {
             const existingData = snap.data() as UserAccount;
+            const resolvedRole: UserRole = isDefaultAdmin
+              ? 'admin'
+              : existingData.role === 'admin'
+              ? 'admin'
+              : 'user';
             const resolvedAccount: UserAccount = {
               ...existingData,
               id: fbUser.uid,
               name: (existingData.name || fbUser.displayName || 'SafeScan User').slice(0, 100),
               email: (existingData.email || fbUser.email || '').slice(0, 150),
-              role: isDefaultAdmin ? 'admin' : (existingData.role || 'caregiver'),
+              role: resolvedRole,
             };
             setUserAccount(resolvedAccount);
           } else {
@@ -91,14 +96,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const signInWithGoogle = async (selectedRole: UserRole = 'caregiver') => {
+  const signInWithGoogle = async (selectedRole: UserRole = 'user') => {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
     setCurrentUser(user);
 
     const isDefaultAdmin = isEmailAdmin(user.email);
-    const defaultRole: UserRole = isDefaultAdmin ? 'admin' : selectedRole;
+    const defaultRole: UserRole = isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : 'user';
 
     let account: UserAccount = {
       id: user.uid,
@@ -117,7 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: user.uid,
           name: (user.displayName || existing.name || 'SafeScan User').slice(0, 100),
           email: (user.email || existing.email || '').slice(0, 150),
-          role: isDefaultAdmin ? 'admin' : (selectedRole || existing.role || 'caregiver'),
+          role: isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : (existing.role === 'admin' ? 'admin' : 'user'),
           createdAt: existing.createdAt || account.createdAt,
         };
       }
@@ -132,23 +137,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchDemoRole = (role: UserRole) => {
     if (currentUser && userAccount) {
-      updateAccountRole(role);
+      updateAccountRole(role === 'admin' ? 'admin' : 'user');
       return;
     }
 
-    const demoAccounts: Record<UserRole, UserAccount> = {
+    const demoAccounts: Record<string, UserAccount> = {
+      user: {
+        id: 'demo-user-id',
+        name: 'Ravi Sharma (Member Account)',
+        email: 'ravi.sharma.demo@safescan.csp',
+        role: 'user',
+        createdAt: new Date().toISOString(),
+      },
       senior: {
-        id: 'demo-senior-user-id',
-        name: 'Senior Citizen User',
-        email: 'senior.user@safescan.csp',
-        role: 'senior',
+        id: 'demo-user-id',
+        name: 'Ravi Sharma (Member Account)',
+        email: 'ravi.sharma.demo@safescan.csp',
+        role: 'user',
         createdAt: new Date().toISOString(),
       },
       caregiver: {
-        id: 'demo-caregiver-user-id',
-        name: 'Suresh Kumar (Family Caregiver)',
-        email: 'suresh.kumar.demo@safescan.csp',
-        role: 'caregiver',
+        id: 'demo-user-id',
+        name: 'Ravi Sharma (Member Account)',
+        email: 'ravi.sharma.demo@safescan.csp',
+        role: 'user',
         createdAt: new Date().toISOString(),
       },
       admin: {
@@ -160,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     };
 
-    const target = demoAccounts[role];
+    const target = demoAccounts[role] || demoAccounts.user;
     setUserAccount(target);
     localStorage.setItem('safescan_demo_session', JSON.stringify(target));
   };
@@ -178,12 +190,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateAccountRole = async (newRole: UserRole) => {
     if (!userAccount) return;
+    const resolvedRole = newRole === 'admin' ? 'admin' : 'user';
     const updated: UserAccount = {
       ...userAccount,
       id: currentUser?.uid || userAccount.id,
       name: (userAccount.name || currentUser?.displayName || 'SafeScan User').slice(0, 100),
       email: (userAccount.email || currentUser?.email || '').slice(0, 150),
-      role: newRole,
+      role: resolvedRole,
       createdAt: userAccount.createdAt || new Date().toISOString(),
     };
     setUserAccount(updated);
@@ -198,7 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const role = userAccount?.role || 'caregiver';
+  const role = userAccount?.role || 'user';
   const isAdmin = role === 'admin' || isEmailAdmin(currentUser?.email);
 
   return (

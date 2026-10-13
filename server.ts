@@ -225,7 +225,7 @@ runSafeDatabaseMigration();
  * Atomically validates identity, computes keyed HMAC-SHA256 fingerprint,
  * checks /identity_registry, and creates a new senior profile only if unique.
  */
-app.post('/api/seniors/register', async (req, res) => {
+app.post(['/api/seniors/register', '/api/members/register'], async (req, res) => {
   try {
     const {
       identityNumber,
@@ -405,7 +405,7 @@ app.post('/api/seniors/register', async (req, res) => {
       return res.status(409).json({
         status: 'DUPLICATE_IDENTITY',
         code: 'ALREADY_REGISTERED',
-        message: 'This senior citizen is already registered in SafeScan.',
+        message: 'This member is already registered in SafeScan.',
         detail:
           'This identity is already associated with a SafeScan profile. Please log in or contact the authorized account owner for assistance.',
         isAuthorizedOwner: outcome.isAuthorizedOwner,
@@ -421,7 +421,7 @@ app.post('/api/seniors/register', async (req, res) => {
       profile: outcome.profile,
     });
   } catch (error: any) {
-    console.error('Senior registration error:', error?.message || error);
+    console.error('Member registration error:', error?.message || error);
     return res.status(500).json({
       error: 'Unable to complete registration due to a server or database error. Please try again.',
     });
@@ -429,11 +429,11 @@ app.post('/api/seniors/register', async (req, res) => {
 });
 
 /**
- * PUT /api/seniors/:id
- * Updates an existing senior profile while strictly preserving its permanent SafeScan ID
+ * PUT /api/seniors/:id and /api/members/:id
+ * Updates an existing member profile while strictly preserving its permanent SafeScan ID
  * and existing identity_fingerprint.
  */
-app.put('/api/seniors/:id', async (req, res) => {
+app.put(['/api/seniors/:id', '/api/members/:id'], async (req, res) => {
   try {
     const cleanId = String(req.params.id || '').trim().toUpperCase();
     if (!cleanId) {
@@ -800,22 +800,22 @@ app.post('/api/ai/emergency-triage', async (req, res) => {
       });
     }
 
-    const prompt = `You are an Emergency Medical Triage AI supporting a bystander who just scanned the SafeScan QR code of a senior citizen in distress.
-Senior Details:
-- Name: ${seniorName || 'Senior'}
-- Age: ${age || 'Elderly'}
+    const prompt = `You are an Emergency Medical Triage AI supporting a bystander who just scanned the SafeScan QR code of an individual in distress.
+Individual Details:
+- Name: ${seniorName || 'Member'}
+- Age: ${age !== undefined ? age : 'Not specified'}
 - Blood Group: ${bloodGroup || 'Not specified'}
 - Medical Conditions: ${medicalConditions || 'None specified'}
 - Known Allergies: ${allergies || 'None specified'}
 - Current Medications: ${medications || 'None specified'}
-- Caregiver Emergency Instructions: ${emergencyInstructions || 'Call family immediately'}
-- Bystander Observation/Issue: ${bystanderObservation || 'Lost/confused or unconscious'}
+- Emergency Instructions: ${emergencyInstructions || 'Call family immediately'}
+- Bystander Observation/Issue: ${bystanderObservation || 'In distress or unconscious'}
 
 Generate concise, medically safe, non-invasive first-responder guidance for the bystander while waiting for medical personnel.
 Format the output strictly as JSON with keys:
 - immediateActions (array of 3-4 string instructions)
 - criticalWarnings (array of 2-3 string warnings, especially regarding ${allergies ? `allergies: ${allergies}` : 'allergies'} and safe positioning)
-- calmBystanderTip (1 sentence on keeping the senior calm and oriented)
+- calmBystanderTip (1 sentence on keeping the person calm and oriented)
 
 Output pure JSON only, no markdown.`;
 

@@ -31,7 +31,7 @@ export const AboutCSPPage: React.FC<{ navigate: (path: string) => void }> = ({ n
             About SafeScan Project
           </h1>
           <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            A comprehensive, technology-assisted community care initiative designed to protect senior citizens through secure QR-based emergency identification.
+            A comprehensive, technology-assisted community care initiative designed to protect family members of all ages through secure QR-based emergency identification.
           </p>
         </div>
 
@@ -48,7 +48,7 @@ export const AboutCSPPage: React.FC<{ navigate: (path: string) => void }> = ({ n
           </div>
 
           <p className="text-sm text-slate-700 leading-relaxed">
-            Millions of senior citizens suffer from age-related memory vulnerabilities, including Alzheimer's disease, dementia, cardiovascular instability, diabetes, and speech impairments. When an elderly person wanders, falls, or faints in public:
+            Millions of individuals suffer from health conditions, severe allergies, or communication barriers—including young children, individuals with special needs, and vulnerable seniors with dementia, cardiovascular instability, or speech impairments. When a person wanders, falls, faints, or suffers an emergency in public:
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -62,7 +62,7 @@ export const AboutCSPPage: React.FC<{ navigate: (path: string) => void }> = ({ n
             </div>
             <div className="p-3.5 rounded-2xl bg-red-50/60 border border-red-100 text-xs text-red-900 space-y-1">
               <strong className="block text-red-950 font-bold">Prolonged Anxiety:</strong>
-              Family members spend stressful hours or days attempting to locate lost elderly parents.
+              Family members spend stressful hours or days attempting to locate lost or injured kin.
             </div>
             <div className="p-3.5 rounded-2xl bg-red-50/60 border border-red-100 text-xs text-red-900 space-y-1">
               <strong className="block text-red-950 font-bold">Bystander Helplessness:</strong>
@@ -84,7 +84,7 @@ export const AboutCSPPage: React.FC<{ navigate: (path: string) => void }> = ({ n
           </div>
 
           <p className="text-sm text-slate-700 leading-relaxed">
-            SafeScan empowers families and caregivers to generate a standardized, privacy-preserving emergency ID card for senior citizens. The wearable card carries a resilient QR code that directs any smartphone camera directly to an instantaneous public emergency profile.
+            SafeScan empowers families to generate a standardized, privacy-preserving emergency ID card for members of any age. The wearable card carries a resilient QR code that directs any smartphone camera directly to an instantaneous public emergency profile.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
@@ -128,12 +128,12 @@ export const AboutCSPPage: React.FC<{ navigate: (path: string) => void }> = ({ n
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             {[
-              { title: 'Helps Identify Vulnerable Seniors', desc: 'Instantly identifies lost seniors who are confused or unable to speak.' },
+              { title: 'Helps Identify Vulnerable Members', desc: 'Instantly identifies lost children, accident victims, or confused seniors unable to speak.' },
               { title: 'Drastically Reduces Response Time', desc: 'Allows first responders and good Samaritans to contact kin within seconds.' },
               { title: 'Reunites Families Rapidly', desc: 'Prevents unnecessary police missing-person filings through direct phone dialing.' },
               { title: 'Empowers Community Volunteers', desc: 'Enables bystanders, shopkeepers, and transit workers to assist with confidence.' },
               { title: 'Provides Safe Medical Triage', desc: 'Alerts hospital EMTs about critical allergies, blood group, and chronic ailments.' },
-              { title: 'Technology-Assisted Community Care', desc: 'Bridges modern mobile technology with grassroots humanitarian eldercare.' },
+              { title: 'Technology-Assisted Community Care', desc: 'Bridges modern mobile technology with grassroots humanitarian family care.' },
             ].map((impact, i) => (
               <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-50/40 border border-emerald-100">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -169,7 +169,7 @@ export const AboutCSPPage: React.FC<{ navigate: (path: string) => void }> = ({ n
             </div>
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
               <strong className="text-slate-900 block mb-1">Database & Authentication:</strong>
-              Google Cloud Firestore for real-time document persistence (users, senior_profiles, emergency_reports) and Firebase Authentication for secure role-based access.
+              Google Cloud Firestore for real-time document persistence (users, member/senior profiles, emergency_reports) and Firebase Authentication for secure role-based access.
             </div>
           </div>
         </div>
@@ -178,7 +178,7 @@ export const AboutCSPPage: React.FC<{ navigate: (path: string) => void }> = ({ n
         <div className="p-6 rounded-3xl bg-blue-600 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-600/20">
           <div>
             <h3 className="font-extrabold text-lg">Ready to test the SafeScan workflow?</h3>
-            <p className="text-xs text-blue-100 mt-0.5">Register a senior citizen profile or test the live camera scanner.</p>
+            <p className="text-xs text-blue-100 mt-0.5">Register a family member profile or test the live camera scanner.</p>
           </div>
           <div className="flex items-center gap-2">
             <button

@@ -53,7 +53,7 @@ export const Footer: React.FC<{ navigate: (path: string) => void }> = ({ navigat
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-              SafeScan is a Community Service Project (CSP) designed to help identify senior citizens and provide essential emergency contact and medical information rapidly when they are lost, injured, or unable to speak.
+              SafeScan is a Community Service Project (CSP) designed to help identify members and provide essential emergency contact and medical information rapidly when they are lost, injured, or unable to speak.
             </p>
             <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold pt-1">
               <ShieldCheck className="w-4 h-4" />
@@ -77,12 +77,12 @@ export const Footer: React.FC<{ navigate: (path: string) => void }> = ({ navigat
               </li>
               <li>
                 <button onClick={() => navigate('/dashboard')} className="hover:text-white transition">
-                  Caregiver Dashboard
+                  Family Dashboard
                 </button>
               </li>
               <li>
-                <button onClick={() => navigate('/seniors/new')} className="hover:text-white transition">
-                  Register Senior Profile
+                <button onClick={() => navigate('/members/new')} className="hover:text-white transition">
+                  Register Member Profile
                 </button>
               </li>
               <li>
@@ -97,7 +97,7 @@ export const Footer: React.FC<{ navigate: (path: string) => void }> = ({ navigat
           <div>
             <h5 className="text-white text-xs font-bold uppercase tracking-wider mb-3">Community Service</h5>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Designed as a social safety initiative for vulnerable seniors, Alzheimer's patients, and high-risk cardiac individuals.
+              Designed as a social safety initiative for family members, children, vulnerable seniors, Alzheimer's patients, and high-risk medical individuals.
             </p>
             <div className="mt-3 p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-[11px] text-slate-300">
               <span className="font-bold text-white block">Print formats:</span>
@@ -113,7 +113,7 @@ export const Footer: React.FC<{ navigate: (path: string) => void }> = ({ navigat
           </p>
           <div className="flex flex-wrap items-center justify-between pt-2 text-slate-500 text-xs">
             <span>© {new Date().getFullYear()} SafeScan Emergency Identification System • B.Tech Community Service Project</span>
-            <span>Empowering Senior Care & Compassionate Communities</span>
+            <span>Empowering Community Care & Family Safety</span>
           </div>
         </div>
 

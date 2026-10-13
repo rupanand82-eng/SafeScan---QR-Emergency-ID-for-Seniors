@@ -50,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, isLargeTe
                 </span>
               </span>
               <p className="text-[11px] font-medium text-slate-500 hidden sm:block">
-                Senior Emergency Identification
+                Member Emergency Identification
               </p>
             </div>
           </div>
@@ -92,13 +92,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, isLargeTe
 
             {userAccount && (
               <button
-                onClick={() => handleNav('/seniors/new')}
+                onClick={() => handleNav('/members/new')}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition ${
-                  currentPath === '/seniors/new' ? 'text-blue-600 bg-blue-50' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                  currentPath === '/members/new' || currentPath === '/seniors/new' ? 'text-blue-600 bg-blue-50' : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <Users className="w-4 h-4" />
-                Add Senior
+                Add Member
               </button>
             )}
 
@@ -127,10 +127,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, isLargeTe
 
           {/* Right Side: Accessibility Toggle & User Profile / Login */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Senior A+ Font Toggle */}
+            {/* Accessible A+ Font Toggle */}
             <button
               onClick={() => setIsLargeText(!isLargeText)}
-              title="Toggle Large Senior-Friendly Text"
+              title="Toggle Accessible Large Text"
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                 isLargeText
                   ? 'bg-amber-100 text-amber-900 border-amber-300'
@@ -155,7 +155,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, isLargeTe
                       {userAccount.name.split(' ')[0]}
                     </p>
                     <p className="text-[10px] text-blue-600 font-semibold uppercase">
-                      {role}
+                      {role === 'admin' ? 'Admin' : 'Member'}
                     </p>
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -172,18 +172,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, isLargeTe
                       Switch Role (Demo)
                     </div>
                     <button
-                      onClick={() => { switchDemoRole('senior'); setRoleDropdownOpen(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-50 flex items-center justify-between ${role === 'senior' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}
+                      onClick={() => { switchDemoRole('user'); setRoleDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-50 flex items-center justify-between ${role !== 'admin' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}
                     >
-                      <span>Senior Citizen</span>
-                      {role === 'senior' && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Active</span>}
-                    </button>
-                    <button
-                      onClick={() => { switchDemoRole('caregiver'); setRoleDropdownOpen(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs font-medium hover:bg-slate-50 flex items-center justify-between ${role === 'caregiver' ? 'text-blue-600 font-bold' : 'text-slate-700'}`}
-                    >
-                      <span>Caregiver / Family</span>
-                      {role === 'caregiver' && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Active</span>}
+                      <span>Member / Family</span>
+                      {role !== 'admin' && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Active</span>}
                     </button>
                     <button
                       onClick={() => { switchDemoRole('admin'); setRoleDropdownOpen(false); }}
@@ -261,10 +254,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, isLargeTe
           )}
           {userAccount && (
             <button
-              onClick={() => handleNav('/seniors/new')}
+              onClick={() => handleNav('/members/new')}
               className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-100"
             >
-              Add Senior Profile
+              Add Member Profile
             </button>
           )}
           {isAdmin && (
@@ -287,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, isLargeTe
               onClick={() => setIsLargeText(!isLargeText)}
               className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-800"
             >
-              {isLargeText ? 'Disable Large Font' : 'Enable Large Font (Senior-Friendly)'}
+              {isLargeText ? 'Disable Large Font' : 'Enable Large Font (Accessible)'}
             </button>
             {userAccount ? (
               <button

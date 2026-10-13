@@ -156,7 +156,7 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
             Live Emergency Scanner
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-            Scan Senior Citizen QR Code
+            Scan Member Emergency QR Code
           </h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
             Point your camera at any SafeScan badge, upload a saved QR code image from your media files, or enter the SafeScan ID below.

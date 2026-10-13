@@ -32,7 +32,7 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
             
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600/20 border border-red-500/40 text-red-300 text-xs font-bold uppercase tracking-widest shadow-sm">
               <span className="animate-pulse w-2 h-2 rounded-full bg-red-400" />
-              Community Service Project • Senior Citizen Safety
+              Community Service Project • Family Member Emergency Safety
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] text-white">
@@ -40,7 +40,7 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
             </h1>
 
             <p className="text-base sm:text-lg text-slate-300 font-normal leading-relaxed max-w-2xl mx-auto">
-              SafeScan provides senior citizens with a secure QR-based emergency identity that helps people quickly access essential emergency information and contact their family.
+              SafeScan provides family members of all ages with a secure QR-based emergency identity that helps bystanders and first responders quickly access essential emergency information and contact their family.
             </p>
 
             {/* Hero CTAs */}
@@ -95,10 +95,10 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
               Open Camera Scanner
             </button>
             <button
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/members/new')}
               className="flex-1 md:flex-initial px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition"
             >
-              Register Senior
+              Register Member
             </button>
           </div>
         </div>
@@ -114,17 +114,17 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
             How SafeScan Works
           </h2>
           <p className="text-xs sm:text-sm text-slate-600">
-            A frictionless life-saving pipeline designed for elderly non-tech users and helpful community responders.
+            A frictionless life-saving pipeline designed for families, children, seniors, and helpful community responders.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
-            { step: '1', title: 'Register', desc: 'Caregiver or senior registers securely via Google Auth or role-based account.' },
-            { step: '2', title: 'Create Emergency Profile', desc: 'Add blood group, critical allergies, medications, and primary family contact numbers.' },
-            { step: '3', title: 'Generate QR', desc: 'System automatically generates a cryptographically unique random SafeScan QR token.' },
+            { step: '1', title: 'Register', desc: 'Family account owner registers securely via Google Auth or role-based account.' },
+            { step: '2', title: 'Create Member Emergency Profile', desc: 'Add member date of birth, blood group, critical allergies, medications, and primary contact numbers.' },
+            { step: '3', title: 'Generate QR', desc: 'System automatically generates a cryptographically unique SafeScan emergency token.' },
             { step: '4', title: 'Wear / Carry QR', desc: 'Print standard wallet ID cards, laminate badges, or attach to wristbands and pendants.' },
-            { step: '5', title: 'Scan During Emergency', desc: 'Any bystander, volunteer, or EMT scans the badge with any mobile camera (zero login).' },
+            { step: '5', title: 'Scan During Emergency', desc: 'Any bystander, volunteer, or EMT scans the badge with any mobile camera (zero login required).' },
             { step: '6', title: 'Contact Family', desc: 'Instant 1-tap phone dialing connects the bystander directly to the panicked family.' },
           ].map((item) => (
             <div
@@ -152,15 +152,15 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
               Why SafeScan?
             </h2>
             <p className="text-xs sm:text-sm text-slate-600">
-              Designed specifically with eldercare psychology and emergency triage speed in mind.
+              Designed for families: universal emergency triage speed and peace of mind for loved ones of any age.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { icon: Clock, title: 'Faster Identification', desc: 'No digging through lost wallets or searching locked phones. Information appears in 2 seconds.' },
-              { icon: PhoneCall, title: 'Direct Contact Access', desc: 'Immediate direct 1-tap dial buttons for son, daughter, spouse, or treating physician.' },
-              { icon: Users, title: 'Senior-Friendly Design', desc: 'Elderly individuals do not have to operate smartphones during a crisis; the bystander does.' },
+              { icon: PhoneCall, title: 'Direct Contact Access', desc: 'Immediate direct 1-tap dial buttons for parent, spouse, child, or emergency contacts.' },
+              { icon: Users, title: 'Universal Family Design', desc: 'Children, adults, and seniors are protected without having to operate smartphones during a crisis.' },
               { icon: QrCode, title: 'Resilient QR System', desc: 'High-error-correction QR codes scan reliably even when printed on badges with scratches.' },
               { icon: ShieldCheck, title: 'Privacy-Focused', desc: 'Home addresses are hidden by default; no passwords, bank info, or tracking cookies stored.' },
               { icon: Building2, title: 'Accessible Anywhere', desc: 'Universal responsive web platform works on iOS, Android, laptops, and tablets without installing apps.' },
@@ -190,8 +190,8 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
           {[
+            { icon: '👨‍👩‍👧‍👦', label: 'Family Members', desc: 'Children & adults' },
             { icon: '👵', label: 'Senior Citizens', desc: 'Vulnerable elders' },
-            { icon: '👨‍👩‍👦', label: 'Families & Kin', desc: 'Peace of mind' },
             { icon: '🧑‍⚕️', label: 'Caregivers', desc: 'Profile managers' },
             { icon: '🤝', label: 'Volunteers', desc: 'Good Samaritans' },
             { icon: '🏥', label: 'Hospitals & EMTs', desc: 'Accident casualty' },
@@ -210,10 +210,10 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
       <section className="bg-slate-900 text-white py-16 px-4">
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <h2 className="text-3xl font-black tracking-tight sm:text-4xl text-white">
-            Protect Your Senior Loved Ones Today
+            Protect Your Loved Ones Today
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
-            Free community service platform. Create an emergency profile in under 2 minutes, download your printable ID badge, and ensure immediate protection.
+            Free community service platform. Create a member emergency profile in under 2 minutes, download your printable ID badge, and ensure immediate protection.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button

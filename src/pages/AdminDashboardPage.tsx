@@ -116,7 +116,7 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-800/80 border border-slate-700 p-5 rounded-2xl space-y-1">
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-bold uppercase tracking-wider">Registered Seniors</span>
+              <span className="text-xs font-bold uppercase tracking-wider">Registered Members</span>
               <Users className="w-4 h-4 text-blue-400" />
             </div>
             <p className="text-3xl font-black text-white">{seniors.length}</p>
@@ -163,7 +163,7 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            Registered Seniors Registry ({seniors.length})
+            Registered Members Registry ({seniors.length})
           </button>
           <button
             onClick={() => setActiveTab('reports')}
@@ -177,7 +177,7 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
           </button>
         </div>
 
-        {/* TAB 1: SENIORS REGISTRY */}
+        {/* TAB 1: MEMBERS REGISTRY */}
         {activeTab === 'seniors' && (
           <div className="bg-slate-800/90 border border-slate-700 rounded-2xl overflow-hidden shadow-xl">
             <div className="p-4 sm:p-5 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -192,7 +192,7 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
                 />
               </div>
               <span className="text-xs text-slate-400">
-                Displaying {filtered.length} senior records
+                Displaying {filtered.length} member records
               </span>
             </div>
 
@@ -202,14 +202,14 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
               </div>
             ) : filtered.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs">
-                No matching senior citizen records found.
+                No matching member records found.
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-900/60 text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-700">
                     <tr>
-                      <th className="py-3 px-4">Senior Name</th>
+                      <th className="py-3 px-4">Member Name</th>
                       <th className="py-3 px-4">Age / Blood</th>
                       <th className="py-3 px-4">Emergency Contact</th>
                       <th className="py-3 px-4">SafeScan ID</th>
@@ -289,7 +289,7 @@ export const AdminDashboardPage: React.FC<{ navigate: (path: string) => void }> 
             <div>
               <h3 className="font-extrabold text-base text-white">Emergency Incident Log</h3>
               <p className="text-xs text-slate-400">
-                Audited list of reports submitted by citizens when finding lost seniors
+                Audited list of reports submitted by citizens when finding lost members or individuals in distress
               </p>
             </div>
 

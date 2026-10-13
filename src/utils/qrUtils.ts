@@ -63,7 +63,7 @@ export function formatEmergencyQrPayload(senior: SeniorProfile, mode: 'card' | '
   const lines = [
     '🚨 SAFESCAN EMERGENCY MEDICAL ID',
     `ID: ${safeScanId}`,
-    `Patient: ${senior.fullName} (${senior.age} yrs, ${senior.gender || 'Senior'})`,
+    `Patient: ${senior.fullName} (${senior.age} yrs, ${senior.gender || 'Member'})`,
     `Blood Group: ${senior.bloodGroup}`,
     `Emergency Contact: ${senior.primaryContactName} (${senior.primaryContactRelation || 'Family'})`,
     `Call Family: ${senior.primaryContactPhone}`,

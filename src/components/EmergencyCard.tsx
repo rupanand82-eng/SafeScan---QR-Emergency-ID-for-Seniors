@@ -89,13 +89,13 @@ export const EmergencyCard: React.FC<EmergencyCardProps> = ({ senior, onClose })
               </div>
             </div>
             <div className="bg-red-50 text-red-700 text-[11px] font-black px-2 py-0.5 rounded border border-red-200">
-              SENIOR ID
+              MEMBER ID
             </div>
           </div>
 
           {/* Main Info with Photo & QR */}
           <div className="grid grid-cols-12 gap-3 items-center my-1">
-            {/* Senior Photo & Blood Group */}
+            {/* Member Photo & Blood Group */}
             <div className="col-span-4 flex flex-col items-center">
               <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-slate-300 bg-slate-100 shadow-inner flex items-center justify-center">
                 {senior.photoUrl ? (

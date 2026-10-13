@@ -202,8 +202,8 @@ export async function cleanupDemoProfiles(): Promise<void> {
         const filtered = all.filter(
           (p) =>
             !p.isDemo &&
-            !DEMO_PROFILE_IDS.includes(p.id?.toUpperCase()) &&
-            !DEMO_PROFILE_IDS.includes(p.safeScanId?.toUpperCase())
+            !(p.id && DEMO_PROFILE_IDS.includes(p.id.toUpperCase())) &&
+            !(p.safeScanId && DEMO_PROFILE_IDS.includes(p.safeScanId.toUpperCase()))
         );
         localStorage.setItem('safescan_all_profiles', JSON.stringify(filtered));
       }
@@ -504,7 +504,7 @@ export function validateIdentityNumberClient(rawInput: string): {
       valid: false,
       normalized: '',
       formattedDisplay: '',
-      error: 'Please enter the senior citizen’s 12-digit Identity / Synthetic Aadhaar number.',
+      error: 'Please enter the member’s 12-digit Identity / Synthetic Aadhaar number.',
     };
   }
 
@@ -775,7 +775,7 @@ export async function registerUniqueSeniorProfileDirect(
     return {
       status: 'DUPLICATE_IDENTITY',
       code: 'ALREADY_REGISTERED',
-      message: 'This senior citizen is already registered in SafeScan.',
+      message: 'This member is already registered in SafeScan.',
       detail:
         'This identity is already associated with a SafeScan profile. Please log in or contact the authorized account owner for assistance.',
       isAuthorizedOwner: outcome.isAuthorizedOwner,
@@ -878,6 +878,30 @@ export async function updateExistingSeniorProfile(
   const existing = await getSeniorProfile(cleanId);
   const now = new Date().toISOString();
   const merged: SeniorProfile = {
+    userId: payload.userId || existing?.userId || 'unknown-user',
+    fullName: payload.fullName || existing?.fullName || '',
+    age: payload.age !== undefined ? payload.age : (existing?.age ?? 0),
+    gender: payload.gender || existing?.gender || 'Other',
+    bloodGroup: payload.bloodGroup || existing?.bloodGroup || 'O+',
+    medicalConditions: payload.medicalConditions || existing?.medicalConditions || '',
+    allergies: payload.allergies || existing?.allergies || 'None',
+    medications: payload.medications || existing?.medications || '',
+    emergencyInstructions: payload.emergencyInstructions || existing?.emergencyInstructions || '',
+    primaryContactName: payload.primaryContactName || existing?.primaryContactName || '',
+    primaryContactRelation: payload.primaryContactRelation || existing?.primaryContactRelation || '',
+    primaryContactPhone: payload.primaryContactPhone || existing?.primaryContactPhone || '',
+    status: (payload as any).status || existing?.status || 'active',
+    publicVisibility: payload.publicVisibility || existing?.publicVisibility || {
+      showPhoto: true,
+      showAge: true,
+      showBloodGroup: true,
+      showConditions: true,
+      showAllergies: true,
+      showMedications: true,
+      showHospital: true,
+      showSecondaryContact: true,
+      showAddress: false,
+    },
     ...(existing || {}),
     ...payload,
     id: cleanId,
@@ -890,6 +914,7 @@ export async function updateExistingSeniorProfile(
     identityStatus:
       existing?.identityStatus ||
       (existing?.identity_fingerprint ? 'verified_unique' : 'legacy_unverified'),
+    createdAt: existing?.createdAt || now,
     updatedAt: now,
   };
 
@@ -1032,3 +1057,14 @@ export async function getEmergencyReports(): Promise<EmergencyReport[]> {
     return [];
   }
 }
+
+// Member Profile Service Aliases
+export const getMemberProfile = getSeniorProfile;
+export const saveMemberProfile = saveSeniorProfile;
+export const getAllMembers = getAllSeniors;
+export const getMembersByUserId = getSeniorsByUserId;
+export const updateMemberStatus = updateSeniorStatus;
+export const deleteMemberProfile = deleteSeniorProfile;
+export const registerUniqueMemberProfile = registerUniqueSeniorProfile;
+export const updateExistingMemberProfile = updateExistingSeniorProfile;
+

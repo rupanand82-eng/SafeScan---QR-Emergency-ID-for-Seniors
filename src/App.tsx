@@ -83,17 +83,20 @@ function AppContent() {
       return <AuthPage navigate={navigate} />;
     }
 
-    // 5. Senior Edit Form
-    if (currentPath.startsWith('/seniors/edit/')) {
+    // 5. Member / Senior Edit Form
+    if (currentPath.startsWith('/members/edit/') || currentPath.startsWith('/seniors/edit/')) {
       if (!userAccount && !loading) {
         return <AuthPage navigate={navigate} />;
       }
-      const editId = currentPath.replace('/seniors/edit/', '').split('?')[0];
+      const editId = currentPath
+        .replace('/members/edit/', '')
+        .replace('/seniors/edit/', '')
+        .split('?')[0];
       return <SeniorFormPage seniorId={editId} navigate={navigate} />;
     }
 
-    // 6. Senior New Form
-    if (currentPath === '/seniors/new') {
+    // 6. Member / Senior New Form
+    if (currentPath === '/members/new' || currentPath === '/seniors/new') {
       if (!userAccount && !loading) {
         return <AuthPage navigate={navigate} />;
       }

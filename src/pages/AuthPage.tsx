@@ -15,7 +15,7 @@ import {
 
 export const AuthPage: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const { signInWithGoogle, switchDemoRole, userAccount } = useAuth();
-  const [selectedRole, setSelectedRole] = useState<UserRole>('caregiver');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('user');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +59,7 @@ export const AuthPage: React.FC<{ navigate: (path: string) => void }> = ({ navig
             SafeScan Access Portal
           </h1>
           <p className="text-xs text-slate-500">
-            Secure emergency identity registry for senior citizens and family caregivers
+            Secure emergency identity registry for members of any age and their families
           </p>
         </div>
 
@@ -78,31 +78,18 @@ export const AuthPage: React.FC<{ navigate: (path: string) => void }> = ({ navig
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
               Select Your Intended Account Role
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedRole('caregiver')}
+                onClick={() => setSelectedRole('user')}
                 className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1 ${
-                  selectedRole === 'caregiver'
+                  selectedRole !== 'admin'
                     ? 'border-blue-600 bg-blue-50/60 text-blue-800 font-bold shadow-sm'
                     : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <Users className="w-4 h-4 text-blue-600" />
-                <span className="text-[11px] leading-tight">Caregiver</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedRole('senior')}
-                className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1 ${
-                  selectedRole === 'senior'
-                    ? 'border-blue-600 bg-blue-50/60 text-blue-800 font-bold shadow-sm'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Heart className="w-4 h-4 text-red-500" />
-                <span className="text-[11px] leading-tight">Senior</span>
+                <span className="text-[11px] leading-tight font-bold">Member / Family Account</span>
               </button>
 
               <button
@@ -115,7 +102,7 @@ export const AuthPage: React.FC<{ navigate: (path: string) => void }> = ({ navig
                 }`}
               >
                 <Shield className="w-4 h-4 text-indigo-600" />
-                <span className="text-[11px] leading-tight">Admin</span>
+                <span className="text-[11px] leading-tight font-bold">Administrator</span>
               </button>
             </div>
           </div>
@@ -170,26 +157,14 @@ export const AuthPage: React.FC<{ navigate: (path: string) => void }> = ({ navig
             <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
-                onClick={() => handleDemoLogin('caregiver')}
+                onClick={() => handleDemoLogin('user')}
                 className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition flex items-center justify-between text-xs"
               >
                 <div>
-                  <strong className="text-slate-800 font-bold block">Caregiver Account</strong>
-                  <span className="text-slate-500 text-[10px]">Registers & manages senior citizen emergency cards</span>
+                  <strong className="text-slate-800 font-bold block">Member / Family Account</strong>
+                  <span className="text-slate-500 text-[10px]">Registers & manages family emergency ID cards</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-blue-600" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('senior')}
-                className="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 transition flex items-center justify-between text-xs"
-              >
-                <div>
-                  <strong className="text-slate-800 font-bold block">Senior Citizen Account</strong>
-                  <span className="text-slate-500 text-[10px]">Views own registered QR & emergency medical profile</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
               </button>
 
               <button

@@ -1,4 +1,4 @@
-export type UserRole = 'senior' | 'caregiver' | 'admin';
+export type UserRole = 'user' | 'admin' | 'senior' | 'member' | 'caregiver';
 
 export interface UserAccount {
   id: string;
@@ -9,7 +9,7 @@ export interface UserAccount {
   createdAt: string;
 }
 
-export interface SeniorProfile {
+export interface MemberProfile {
   id: string;
   safeScanId?: string; // Unique SafeScan Emergency ID (e.g. SAFE-0AIK13, SS-1001)
   patientId: string;
@@ -17,7 +17,7 @@ export interface SeniorProfile {
   userId: string;
   fullName: string;
   dateOfBirth?: string;
-  age: number;
+  age: number; // Any age: child, adult, senior
   gender: string;
   photoUrl?: string;
   bloodGroup: string;
@@ -52,10 +52,10 @@ export interface SeniorProfile {
   
   // Security, Identity & QR
   qrToken: string;
-  identity_fingerprint?: string; // Server-generated keyed HMAC-SHA256 fingerprint for duplicate prevention
+  identity_fingerprint?: string; // Server/client keyed HMAC-SHA256 fingerprint for duplicate prevention
   identityMasked?: string; // Masked last-4 format (e.g. XXXX-XXXX-4821), never raw Aadhaar
   identityStatus?: 'verified_unique' | 'legacy_unverified';
-  linkedCaregiverIds?: string[]; // Caregiver UIDs approved by the profile owner
+  linkedCaregiverIds?: string[];
   status: 'active' | 'disabled';
   isDemo?: boolean;
   publicVisibility: {
@@ -72,6 +72,9 @@ export interface SeniorProfile {
   createdAt: string;
   updatedAt: string;
 }
+
+// Backward-compatible alias for existing codebase
+export type SeniorProfile = MemberProfile;
 
 export interface IdentityRegistryEntry {
   identity_fingerprint: string;
@@ -108,8 +111,10 @@ export interface DuplicateRegistrationResponse {
 
 export interface EmergencyReport {
   id: string;
-  seniorId: string;
-  seniorName?: string;
+  seniorId: string; // Member ID
+  seniorName?: string; // Member Name
+  memberId?: string;
+  memberName?: string;
   reporterName: string;
   reporterPhone: string;
   message: string;

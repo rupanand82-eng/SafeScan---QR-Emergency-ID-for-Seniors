@@ -62,12 +62,12 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
   const [formError, setFormError] = useState<string | null>(null);
   const [requestingAccess, setRequestingAccess] = useState(false);
   const [accessRequestMessage, setAccessRequestMessage] = useState<string | null>(null);
-  const [relationshipNote, setRelationshipNote] = useState('Family caregiver requesting shared access');
+  const [relationshipNote, setRelationshipNote] = useState('Family member requesting shared access');
 
   // Form State
   const [fullName, setFullName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [age, setAge] = useState<number>(68);
+  const [age, setAge] = useState<number | string>(28);
   const [gender, setGender] = useState('Male');
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoFileName, setPhotoFileName] = useState('');
@@ -94,7 +94,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
 
   // Contacts
   const [primaryContactName, setPrimaryContactName] = useState('');
-  const [primaryContactRelation, setPrimaryContactRelation] = useState('Child (Son/Daughter)');
+  const [primaryContactRelation, setPrimaryContactRelation] = useState('Family (Parent / Spouse / Sibling)');
   const [primaryContactPhone, setPrimaryContactPhone] = useState('');
   const [secondaryContactName, setSecondaryContactName] = useState('');
   const [secondaryContactRelation, setSecondaryContactRelation] = useState('');
@@ -118,6 +118,30 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
     showAddress: false, // Default private for safety
   });
 
+  // Calculate age automatically from Date of Birth
+  const handleDateOfBirthChange = (dobString: string) => {
+    setDateOfBirth(dobString);
+    setFormError(null);
+    if (!dobString) return;
+
+    const dob = new Date(dobString);
+    if (dob > new Date()) {
+      setFormError('Date of birth cannot be in the future.');
+      return;
+    }
+
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      calculatedAge--;
+    }
+
+    if (calculatedAge >= 0 && calculatedAge <= 125) {
+      setAge(calculatedAge);
+    }
+  };
+
   // Load existing profile if editing or assign next Patient ID
   useEffect(() => {
     if (seniorId) {
@@ -133,7 +157,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
             );
             setFullName(data.fullName);
             setDateOfBirth(data.dateOfBirth || '');
-            setAge(data.age || 68);
+            setAge(data.age !== undefined ? data.age : 28);
             setGender(data.gender || 'Male');
             setPhotoUrl(data.photoUrl || '');
             setPhone(data.phone || '');
@@ -337,12 +361,28 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
     setAccessRequestMessage(null);
 
     if (!fullName.trim() || !primaryContactName.trim() || !primaryContactPhone.trim()) {
-      setFormError('Please fill out the Senior Full Name and Primary Emergency Contact information.');
+      setFormError('Please fill out the Member Full Name and Primary Emergency Contact information.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    // Validate identity number when registering a new senior
+    if (dateOfBirth) {
+      const dob = new Date(dateOfBirth);
+      if (dob > new Date()) {
+        setFormError('Date of birth cannot be in the future.');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    }
+
+    const numAge = Number(age);
+    if (isNaN(numAge) || numAge < 0 || numAge > 125) {
+      setFormError('Please enter a valid age between 0 and 125 years.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // Validate identity number when registering a new member
     if (!isEditing) {
       const idCheck = validateIdentityNumberClient(identityNumber);
       if (!idCheck.valid) {
@@ -361,7 +401,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
         userEmail: userAccount?.email || '',
         fullName: fullName.trim(),
         dateOfBirth,
-        age: Number(age) || 68,
+        age: numAge,
         gender,
         photoUrl:
           photoUrl ||
@@ -426,7 +466,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
       }, 1500);
     } catch (err: any) {
       console.error('Save profile error:', err);
-      setFormError(err.message || 'Failed to save senior profile. Please check your connection and try again.');
+      setFormError(err.message || 'Failed to save member profile. Please check your connection and try again.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
@@ -455,7 +495,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
             Back to Dashboard
           </button>
           <span className="text-xs text-slate-400 font-mono">
-            {isEditing ? `Editing: ${fullName}` : 'New Unique Senior Registration'}
+            {isEditing ? `Editing: ${fullName}` : 'New Unique Member Registration'}
           </span>
         </div>
 
@@ -468,7 +508,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {isEditing ? 'Update Patient Emergency Profile' : 'Register Patient Emergency Profile'}
+                  {isEditing ? 'Update Member Emergency Profile' : 'Register Member Emergency Profile'}
                 </h1>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {isEditing
@@ -489,7 +529,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
           </div>
         </div>
 
-        {/* DUPLICATE SENIOR REGISTRATION ALERT BANNER */}
+        {/* DUPLICATE MEMBER REGISTRATION ALERT BANNER */}
         {duplicateConflict && (
           <div
             role="alert"
@@ -504,7 +544,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                   Duplicate Registration Prevented
                 </span>
                 <h2 className="text-lg sm:text-xl font-black text-slate-900">
-                  {duplicateConflict.message || 'This senior citizen is already registered in SafeScan.'}
+                  {duplicateConflict.message || 'This member is already registered in SafeScan.'}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
                   {duplicateConflict.detail}
@@ -515,7 +555,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
               </div>
             </div>
 
-            {/* Authorized Owner / Caregiver Options vs Unauthorized Options */}
+            {/* Authorized Owner / Family Options vs Unauthorized Options */}
             <div className="pt-2 border-t border-amber-200/80 flex flex-wrap items-center gap-2.5">
               {duplicateConflict.isAuthorizedOwner && duplicateConflict.existingSafeScanId && (
                 <>
@@ -529,7 +569,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                   </button>
                   <button
                     type="button"
-                    onClick={() => navigate(`/seniors/edit/${duplicateConflict.existingSafeScanId}`)}
+                    onClick={() => navigate(`/members/edit/${duplicateConflict.existingSafeScanId}`)}
                     className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5"
                   >
                     Update Existing Profile
@@ -556,12 +596,12 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
               </button>
             </div>
 
-            {/* Caregiver Access / Link Request Option when logged into a different caregiver account */}
+            {/* Access Request Option when logged into another account */}
             {!duplicateConflict.isAuthorizedOwner && userAccount && (
               <div className="p-4 rounded-xl bg-white/90 border border-amber-200 space-y-2.5">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
                   <UserPlus className="w-4 h-4 text-blue-600" />
-                  <span>Are you a family member or secondary caregiver for this senior?</span>
+                  <span>Are you a family member requesting shared access for this member?</span>
                 </div>
                 <p className="text-[11px] text-slate-600">
                   For privacy, existing profile details are hidden until approved by the primary account owner. You can send an access link request below:
@@ -577,7 +617,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                       type="text"
                       value={relationshipNote}
                       onChange={(e) => setRelationshipNote(e.target.value)}
-                      placeholder="Your relationship to the senior (e.g. Daughter / Caregiver)"
+                      placeholder="Your relationship to the member (e.g. Spouse / Parent / Child)"
                       className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
@@ -587,7 +627,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                       className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
-                      {requestingAccess ? 'Sending Request...' : 'Request Caregiver Access'}
+                      {requestingAccess ? 'Sending Request...' : 'Request Access'}
                     </button>
                   </div>
                 )}
@@ -609,7 +649,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
             <span>
               {isEditing
                 ? `Profile updated! Permanent SafeScan ID (${assignedPatientId}) preserved. Redirecting...`
-                : `Unique Senior Profile & QR Code (${assignedPatientId}) created! Redirecting to Dashboard...`}
+                : `Unique Member Profile & QR Code (${assignedPatientId}) created! Redirecting to Dashboard...`}
             </span>
           </div>
         )}
@@ -659,7 +699,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-blue-600" />
-                      Verified Identity Number (Synthetic Aadhaar / National Senior ID) *
+                      Verified Identity Number (Synthetic Aadhaar / National ID) *
                     </label>
                     <button
                       type="button"
@@ -698,7 +738,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                   ) : null}
 
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    <strong>Privacy Guarantee:</strong> SafeScan never stores your raw Aadhaar/identity number in plaintext and never includes it in QR codes or public URLs. The backend normalizes the input and computes an irreversible keyed <code className="font-mono text-slate-700">HMAC-SHA256</code> fingerprint (<code className="font-mono text-slate-700">identity_fingerprint</code>) solely to prevent duplicate registrations of the same senior citizen. Use synthetic numbers for testing.
+                    <strong>Privacy Guarantee:</strong> SafeScan never stores your raw Aadhaar/identity number in plaintext and never includes it in QR codes or public URLs. The backend normalizes the input and computes an irreversible keyed <code className="font-mono text-slate-700">HMAC-SHA256</code> fingerprint (<code className="font-mono text-slate-700">identity_fingerprint</code>) solely to prevent duplicate registrations of the same member. Use synthetic numbers for testing.
                   </p>
                 </>
               )}
@@ -715,21 +755,6 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                   placeholder="e.g. Ravi Kumar"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Age (Years) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={40}
-                  max={120}
-                  value={age}
-                  onChange={(e) => setAge(Number(e.target.value))}
                   className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
@@ -755,15 +780,37 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                 </label>
                 <input
                   type="date"
+                  max={new Date().toISOString().split('T')[0]}
                   value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  onChange={(e) => handleDateOfBirthChange(e.target.value)}
                   className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                 />
+                <span className="text-[10px] text-slate-500 mt-0.5 block">Age calculates automatically</span>
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Senior Personal Phone (If carrying mobile)
+                  Age (Years) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  max={125}
+                  value={age}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                    setAge(val);
+                  }}
+                  placeholder="e.g. 28"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <span className="text-[10px] text-slate-500 mt-0.5 block">All ages allowed (0-125)</span>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Personal Phone (If carrying mobile)
                 </label>
                 <input
                   type="tel"
@@ -778,7 +825,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-bold text-slate-700 block">
-                    Senior Profile Photo (Upload Media File, Camera, or Link)
+                    Member Profile Photo (Upload Media File, Camera, or Link)
                   </label>
                   <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
                     <button
@@ -814,7 +861,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                     {photoUrl ? (
                       <img
                         src={photoUrl}
-                        alt="Senior Preview"
+                        alt="Member Preview"
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -1182,7 +1229,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="e.g. Senior suffers from memory loss and gets panicked easily. Please speak softly in Hindi or Telugu. Contact son Suresh immediately. Do NOT leave alone."
+                  placeholder="e.g. Member suffers from asthma/memory loss. Please speak calmly. Contact primary contact immediately. Keep in a well-ventilated space."
                   value={emergencyInstructions}
                   onChange={(e) => setEmergencyInstructions(e.target.value)}
                   className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 outline-none"

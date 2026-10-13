@@ -55,7 +55,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [loadingTriage, setLoadingTriage] = useState(false);
   const [triageGuidance, setTriageGuidance] = useState<TriageGuidance | null>(null);
-  const [bystanderObservation, setBystanderObservation] = useState('Senior seems confused or disoriented');
+  const [bystanderObservation, setBystanderObservation] = useState('Person seems distressed or disoriented');
 
   // Load Profile from Database using Patient ID
   useEffect(() => {
@@ -168,7 +168,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
       console.error('Triage fetch error:', err);
       setTriageGuidance({
         immediateActions: [
-          'Keep the senior resting in a calm, shaded, safe environment.',
+          'Keep the person resting in a calm, shaded, safe environment.',
           'Call their emergency contact or 112 immediately.',
           'Check consciousness and regular breathing.',
         ],
@@ -218,6 +218,8 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
         id: `report-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         seniorId: profile.id,
         seniorName: profile.fullName,
+        memberId: profile.id,
+        memberName: profile.fullName,
         reporterName: reporterName || 'Concerned Bystander',
         reporterPhone: reporterPhone || 'Not provided',
         message: reportMessage,

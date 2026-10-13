@@ -145,24 +145,24 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-bold border border-blue-400/30">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>SafeScan Family & Caregiver Hub</span>
+                <span>SafeScan Family Hub</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                Welcome, {userAccount?.name || 'Caregiver'}
+                Welcome, {userAccount?.name || 'Family Member'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
-                Manage your registered senior family members, print wearable emergency ID cards, and review bystander emergency incident alerts.
+                Manage your registered family members, print wearable emergency ID cards, and review bystander emergency incident alerts.
               </p>
             </div>
 
             {/* Quick Actions Bar */}
             <div className="flex flex-wrap items-center gap-2.5">
               <button
-                onClick={() => navigate('/seniors/new')}
+                onClick={() => navigate('/members/new')}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition"
               >
                 <Plus className="w-4 h-4" />
-                Add Senior
+                Add Member
               </button>
               <button
                 onClick={() => navigate('/scan')}
@@ -182,7 +182,7 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Registered Seniors</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Registered Members</span>
               <span className="text-2xl font-black text-slate-900">{totalSeniors}</span>
             </div>
           </div>
@@ -239,7 +239,7 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
           />
         )}
 
-        {/* Pending Caregiver Access / Link Requests */}
+        {/* Pending Member Access / Link Requests */}
         {accessRequests.length > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
@@ -247,10 +247,10 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
                 <UserPlus className="w-5 h-5 text-amber-700" />
                 <div>
                   <h2 className="text-sm font-black text-slate-900">
-                    Pending Family Caregiver Link Requests ({accessRequests.length})
+                    Pending Family Member Link Requests ({accessRequests.length})
                   </h2>
                   <p className="text-xs text-slate-600">
-                    Another caregiver attempted to register a senior already under your care and requested shared access.
+                    Another family member attempted to register a member already under your care and requested shared access.
                   </p>
                 </div>
               </div>
@@ -292,19 +292,19 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
           </div>
         )}
 
-        {/* Managed Seniors List */}
+        {/* Managed Members List */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-black text-slate-900">Senior Emergency Profiles</h2>
-              <p className="text-xs text-slate-500">Each senior has an individual wearable QR code & printable card</p>
+              <h2 className="text-lg font-black text-slate-900">Member Emergency Profiles</h2>
+              <p className="text-xs text-slate-500">Each member has an individual wearable QR code & printable card</p>
             </div>
 
             <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search name, blood, token..."
+                placeholder="Search member name, blood group, ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 outline-none focus:border-blue-500"
@@ -318,12 +318,12 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
             </div>
           ) : filteredSeniors.length === 0 ? (
             <div className="p-12 text-center space-y-3">
-              <p className="text-sm font-semibold text-slate-600">No senior citizens registered yet.</p>
+              <p className="text-sm font-semibold text-slate-600">No members registered yet.</p>
               <button
-                onClick={() => navigate('/seniors/new')}
+                onClick={() => navigate('/members/new')}
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs"
               >
-                Register Your First Senior
+                Register Your First Member
               </button>
             </div>
           ) : (
@@ -407,7 +407,7 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
                     </button>
 
                     <button
-                      onClick={() => navigate(`/seniors/edit/${senior.id}`)}
+                      onClick={() => navigate(`/members/edit/${senior.id}`)}
                       className="p-2 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition"
                       title="Edit Profile"
                     >
@@ -457,7 +457,7 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
 
           {reports.length === 0 ? (
             <p className="text-xs text-slate-500 py-4 text-center">
-              No emergency incidents reported. All seniors are currently safe.
+              No emergency incidents reported. All members are currently safe.
             </p>
           ) : (
             <div className="space-y-3">
@@ -465,7 +465,7 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
                 <div key={rep.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-900">
-                      Senior: {rep.seniorName || rep.seniorId}
+                      Member: {rep.memberName || rep.seniorName || rep.seniorId || rep.memberId}
                     </span>
                     <span className="text-slate-400 font-mono text-[11px]">
                       {new Date(rep.createdAt).toLocaleString()}
