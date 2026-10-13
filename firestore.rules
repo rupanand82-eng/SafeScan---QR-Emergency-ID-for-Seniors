@@ -49,13 +49,15 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId &&
         incoming().id == userId &&
         incoming().name is string && incoming().name.size() <= 100 &&
-        incoming().email is string && incoming().email.size() <= 150 &&
-        incoming().role in ['senior', 'caregiver', 'admin'];
+        (!('email' in incoming()) || (incoming().email is string && incoming().email.size() <= 150)) &&
+        (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 30)) &&
+        incoming().role in ['user', 'senior', 'caregiver', 'admin', 'member'];
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin()) &&
         incoming().id == userId &&
         incoming().name is string && incoming().name.size() <= 100 &&
-        incoming().email is string && incoming().email.size() <= 150 &&
-        incoming().role in ['senior', 'caregiver', 'admin'];
+        (!('email' in incoming()) || (incoming().email is string && incoming().email.size() <= 150)) &&
+        (!('phone' in incoming()) || (incoming().phone is string && incoming().phone.size() <= 30)) &&
+        incoming().role in ['user', 'senior', 'caregiver', 'admin', 'member'];
       allow delete: if isAdmin();
     }
 

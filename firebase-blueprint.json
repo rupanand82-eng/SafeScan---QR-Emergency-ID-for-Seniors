@@ -8,11 +8,11 @@
         "id": { "type": "string" },
         "name": { "type": "string", "maxLength": 100 },
         "email": { "type": "string", "maxLength": 150 },
-        "phone": { "type": "string", "maxLength": 20 },
-        "role": { "type": "string", "enum": ["senior", "caregiver", "admin"] },
+        "phone": { "type": "string", "maxLength": 30 },
+        "role": { "type": "string", "enum": ["user", "senior", "caregiver", "admin", "member"] },
         "createdAt": { "type": "string" }
       },
-      "required": ["id", "name", "email", "role", "createdAt"]
+      "required": ["id", "name", "role", "createdAt"]
     },
     "SeniorProfile": {
       "title": "SeniorProfile",

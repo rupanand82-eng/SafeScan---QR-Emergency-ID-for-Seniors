@@ -32,6 +32,7 @@ import {
   UserPlus,
   Check,
   X,
+  Phone,
 } from 'lucide-react';
 
 export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
@@ -150,6 +151,24 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
                 Welcome, {userAccount?.name || 'Family Member'}
               </h1>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                {userAccount?.email && (
+                  <span className="text-[11px] text-slate-300 bg-white/10 px-2.5 py-1 rounded-lg">
+                    {userAccount.email}
+                  </span>
+                )}
+                {userAccount?.phone ? (
+                  <span className="text-[11px] text-emerald-300 bg-emerald-500/20 border border-emerald-400/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-mono">
+                    <Phone className="w-3 h-3 text-emerald-400" />
+                    <span>Verified: {userAccount.phone}</span>
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-amber-300 bg-amber-500/20 border border-amber-400/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-amber-400" />
+                    <span>No phone linked yet</span>
+                  </span>
+                )}
+              </div>
               <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
                 Manage your registered family members, print wearable emergency ID cards, and review bystander emergency incident alerts.
               </p>
