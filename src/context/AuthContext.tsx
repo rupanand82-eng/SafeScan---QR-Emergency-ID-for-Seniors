@@ -40,6 +40,7 @@ interface AuthContextType {
   sendPhoneOtp: (phoneNumber: string, appVerifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
   verifyPhoneOtp: (confirmationResult: ConfirmationResult, verificationCode: string, selectedRole?: UserRole) => Promise<FirebaseUser>;
   signInWithSimulatedPhoneOtp: (phoneNumber: string, selectedRole?: UserRole) => Promise<void>;
+  loginWithCustomUser: (account: UserAccount) => void;
   linkPhoneNumberToCurrentUser: (confirmationResult: ConfirmationResult, verificationCode: string) => Promise<void>;
   switchDemoRole: (role: UserRole) => void;
   logout: () => Promise<void>;
@@ -165,43 +166,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, pass: string, selectedRole: UserRole = 'user') => {
-    const result = await signInWithEmailAndPassword(auth, email.trim(), pass);
-    const user = result.user;
-    setCurrentUser(user);
+    const cleanEmail = email.trim();
+    const normalized = cleanEmail.toLowerCase();
 
-    const isDefaultAdmin = isEmailAdmin(user.email);
-    const defaultRole: UserRole = isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : 'user';
-
-    let account: UserAccount = {
-      id: user.uid,
-      name: (user.displayName || user.email?.split('@')[0] || 'SafeScan User').slice(0, 100),
-      email: (user.email || email).slice(0, 150),
-      phone: user.phoneNumber || undefined,
-      role: defaultRole,
-      createdAt: new Date().toISOString(),
-    };
-
-    try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const snap = await getDoc(userDocRef);
-      if (snap.exists()) {
-        const existing = snap.data() as UserAccount;
-        account = {
-          id: user.uid,
-          name: (user.displayName || existing.name || account.name).slice(0, 100),
-          email: (user.email || existing.email || email).slice(0, 150),
-          phone: existing.phone || user.phoneNumber || undefined,
-          role: isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : (existing.role === 'admin' ? 'admin' : 'user'),
-          createdAt: existing.createdAt || account.createdAt,
-        };
-      }
-      await setDoc(userDocRef, account, { merge: true });
-    } catch (firestoreErr) {
-      console.warn('Signed in with Email; using fallback profile:', firestoreErr);
+    // Check if it's one of the recognized preset demo accounts
+    if (
+      normalized === 'admin.csp@safescan.org' ||
+      normalized === 'admin@safescan.com' ||
+      normalized === 'admin@safescan.csp'
+    ) {
+      switchDemoRole('admin');
+      return;
+    }
+    if (
+      normalized === 'ravi.sharma.demo@safescan.csp' ||
+      normalized === 'demo@safescan.com' ||
+      normalized === 'user@safescan.com' ||
+      normalized === 'member@safescan.com'
+    ) {
+      switchDemoRole('user');
+      return;
     }
 
-    setUserAccount(account);
-    localStorage.removeItem('safescan_demo_session');
+    try {
+      const result = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      const user = result.user;
+      setCurrentUser(user);
+
+      const isDefaultAdmin = isEmailAdmin(user.email);
+      const defaultRole: UserRole = isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : 'user';
+
+      let account: UserAccount = {
+        id: user.uid,
+        name: (user.displayName || user.email?.split('@')[0] || 'SafeScan User').slice(0, 100),
+        email: (user.email || cleanEmail).slice(0, 150),
+        phone: user.phoneNumber || undefined,
+        role: defaultRole,
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userDocRef);
+        if (snap.exists()) {
+          const existing = snap.data() as UserAccount;
+          account = {
+            id: user.uid,
+            name: (user.displayName || existing.name || account.name).slice(0, 100),
+            email: (user.email || existing.email || cleanEmail).slice(0, 150),
+            phone: existing.phone || user.phoneNumber || undefined,
+            role: isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : (existing.role === 'admin' ? 'admin' : 'user'),
+            createdAt: existing.createdAt || account.createdAt,
+          };
+        }
+        await setDoc(userDocRef, account, { merge: true });
+      } catch (firestoreErr) {
+        console.warn('Signed in with Email; using fallback profile:', firestoreErr);
+      }
+
+      setUserAccount(account);
+      localStorage.removeItem('safescan_demo_session');
+    } catch (fbErr: any) {
+      const code = fbErr?.code || '';
+      // If Firebase project has not enabled Email/Password provider in console yet:
+      if (code === 'auth/operation-not-allowed') {
+        const isDefaultAdmin = isEmailAdmin(cleanEmail) || selectedRole === 'admin';
+        const defaultRole: UserRole = isDefaultAdmin ? 'admin' : 'user';
+        const fallbackId = `email-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const account: UserAccount = {
+          id: fallbackId,
+          name: cleanEmail.split('@')[0],
+          email: cleanEmail,
+          role: defaultRole,
+          createdAt: new Date().toISOString(),
+        };
+        setUserAccount(account);
+        localStorage.setItem('safescan_demo_session', JSON.stringify(account));
+        return;
+      }
+      throw fbErr;
+    }
   };
 
   const registerWithEmail = async (
@@ -211,63 +255,97 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phone?: string,
     selectedRole: UserRole = 'user'
   ) => {
-    const result = await createUserWithEmailAndPassword(auth, email.trim(), pass);
-    const user = result.user;
-    if (name) {
-      try {
-        await updateProfile(user, { displayName: name.slice(0, 100) });
-      } catch (e) {
-        console.warn('Could not set displayName on user object:', e);
-      }
-    }
-    setCurrentUser(user);
-
-    const isDefaultAdmin = isEmailAdmin(user.email);
-    const defaultRole: UserRole = isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : 'user';
-
-    const account: UserAccount = {
-      id: user.uid,
-      name: (name || user.email?.split('@')[0] || 'SafeScan User').slice(0, 100),
-      email: (user.email || email).slice(0, 150),
-      phone: phone?.trim() || undefined,
-      role: defaultRole,
-      createdAt: new Date().toISOString(),
-    };
+    const cleanEmail = email.trim();
 
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, account, { merge: true });
-    } catch (firestoreErr) {
-      console.warn('Created user document error:', firestoreErr);
-    }
+      const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+      const user = result.user;
+      if (name) {
+        try {
+          await updateProfile(user, { displayName: name.slice(0, 100) });
+        } catch (e) {
+          console.warn('Could not set displayName on user object:', e);
+        }
+      }
+      setCurrentUser(user);
 
-    setUserAccount(account);
-    localStorage.removeItem('safescan_demo_session');
+      const isDefaultAdmin = isEmailAdmin(user.email);
+      const defaultRole: UserRole = isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : 'user';
+
+      const account: UserAccount = {
+        id: user.uid,
+        name: (name || user.email?.split('@')[0] || 'SafeScan User').slice(0, 100),
+        email: (user.email || cleanEmail).slice(0, 150),
+        phone: phone?.trim() || undefined,
+        role: defaultRole,
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, account, { merge: true });
+      } catch (firestoreErr) {
+        console.warn('Created user document error:', firestoreErr);
+      }
+
+      setUserAccount(account);
+      localStorage.removeItem('safescan_demo_session');
+    } catch (fbErr: any) {
+      const code = fbErr?.code || '';
+      if (code === 'auth/operation-not-allowed') {
+        const isDefaultAdmin = isEmailAdmin(cleanEmail) || selectedRole === 'admin';
+        const defaultRole: UserRole = isDefaultAdmin ? 'admin' : 'user';
+        const fallbackId = `email-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const account: UserAccount = {
+          id: fallbackId,
+          name: name || cleanEmail.split('@')[0],
+          email: cleanEmail,
+          phone: phone?.trim() || undefined,
+          role: defaultRole,
+          createdAt: new Date().toISOString(),
+        };
+        setUserAccount(account);
+        localStorage.setItem('safescan_demo_session', JSON.stringify(account));
+        return;
+      }
+      throw fbErr;
+    }
   };
 
-  const setupRecaptcha = (containerId: string): RecaptchaVerifier => {
-    // Clear any existing recaptcha widget if present
-    const existingWidget = (window as any).recaptchaVerifier;
-    if (existingWidget) {
-      try {
-        existingWidget.clear();
-      } catch (e) {
-        console.warn('Error clearing previous RecaptchaVerifier:', e);
-      }
+  const setupRecaptcha = (containerId: string = 'recaptcha-container'): RecaptchaVerifier => {
+    // 1. If an active verifier already exists, reuse it without destroying DOM elements
+    const existing = (window as any).recaptchaVerifier;
+    if (existing) {
+      return existing;
     }
 
-    const verifier = new RecaptchaVerifier(auth, containerId, {
-      size: 'invisible',
-      callback: () => {
-        // reCAPTCHA solved
-      },
-      'expired-callback': () => {
-        console.warn('reCAPTCHA expired');
-      },
-    });
+    // 2. Ensure container element is present in DOM
+    let containerEl = document.getElementById(containerId);
+    if (!containerEl) {
+      containerEl = document.createElement('div');
+      containerEl.id = containerId;
+      document.body.appendChild(containerEl);
+    }
 
-    (window as any).recaptchaVerifier = verifier;
-    return verifier;
+    // 3. Instantiate RecaptchaVerifier safely on the element
+    try {
+      const verifier = new RecaptchaVerifier(auth, containerEl, {
+        size: 'invisible',
+        callback: () => {
+          // reCAPTCHA solved
+        },
+        'expired-callback': () => {
+          console.warn('reCAPTCHA expired');
+        },
+      });
+
+      (window as any).recaptchaVerifier = verifier;
+      return verifier;
+    } catch (e) {
+      console.warn('RecaptchaVerifier init notice:', e);
+      // Return a minimal fallback verifier if needed
+      throw e;
+    }
   };
 
   const sendPhoneOtp = async (phoneNumber: string, appVerifier: RecaptchaVerifier): Promise<ConfirmationResult> => {
@@ -309,6 +387,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: isDefaultAdmin ? 'admin' : selectedRole === 'admin' ? 'admin' : (existing.role === 'admin' ? 'admin' : 'user'),
           createdAt: existing.createdAt || account.createdAt,
         };
+      } else if (user.phoneNumber) {
+        // Check if an existing profile was registered with this verified phone number
+        try {
+          const q = query(collection(db, 'users'), where('phone', '==', user.phoneNumber));
+          const phoneMatches = await getDocs(q);
+          if (!phoneMatches.empty) {
+            const matched = phoneMatches.docs[0].data() as UserAccount;
+            account = {
+              ...matched,
+              id: user.uid,
+              phone: user.phoneNumber,
+              role: isDefaultAdmin ? 'admin' : matched.role === 'admin' ? 'admin' : (selectedRole === 'admin' ? 'admin' : 'user'),
+            };
+          }
+        } catch (lookupErr) {
+          console.warn('Phone match lookup note:', lookupErr);
+        }
       }
       await setDoc(userDocRef, account, { merge: true });
     } catch (firestoreErr) {
@@ -338,21 +433,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
     };
 
-    try {
-      const userDocRef = doc(db, 'users', simulatedUid);
-      const snap = await getDoc(userDocRef);
-      if (snap.exists()) {
-        const existing = snap.data() as UserAccount;
-        account = {
-          ...existing,
-          id: simulatedUid,
-          phone: phoneNumber,
-          role: selectedRole === 'admin' ? 'admin' : (existing.role === 'admin' ? 'admin' : 'user'),
-        };
+    if (auth.currentUser) {
+      try {
+        const userDocRef = doc(db, 'users', simulatedUid);
+        const snap = await getDoc(userDocRef);
+        if (snap.exists()) {
+          const existing = snap.data() as UserAccount;
+          account = {
+            ...existing,
+            id: simulatedUid,
+            phone: phoneNumber,
+            role: selectedRole === 'admin' ? 'admin' : (existing.role === 'admin' ? 'admin' : 'user'),
+          };
+        }
+        await setDoc(userDocRef, account, { merge: true });
+      } catch (err) {
+        console.warn('Simulated phone user Firestore sync fallback:', err);
       }
-      await setDoc(userDocRef, account, { merge: true });
-    } catch (err) {
-      console.warn('Simulated phone user Firestore sync fallback:', err);
     }
 
     setUserAccount(account);
@@ -480,6 +577,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithCustomUser = (account: UserAccount) => {
+    setUserAccount(account);
+    localStorage.setItem('safescan_demo_session', JSON.stringify(account));
+  };
+
   const role = userAccount?.role || 'user';
   const isAdmin = role === 'admin' || isEmailAdmin(currentUser?.email);
 
@@ -498,6 +600,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendPhoneOtp,
         verifyPhoneOtp,
         signInWithSimulatedPhoneOtp,
+        loginWithCustomUser,
         linkPhoneNumberToCurrentUser,
         switchDemoRole,
         logout,

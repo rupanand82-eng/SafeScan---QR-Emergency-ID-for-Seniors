@@ -115,12 +115,32 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "seniorId", "message", "createdAt"]
+    },
+    "PhoneAccount": {
+      "title": "PhoneAccount",
+      "description": "Phone number authentication credentials with secure hashed unique code",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string", "maxLength": 30 },
+        "phoneKey": { "type": "string", "maxLength": 50 },
+        "codeHash": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["phone", "phoneKey", "codeHash", "userId", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User accounts profile and role"
+    },
+    "/phone_accounts/{phoneId}": {
+      "schema": { "$ref": "#/entities/PhoneAccount" },
+      "description": "Registered phone number accounts and unique code credentials"
     },
     "/senior_profiles/{profileId}": {
       "schema": { "$ref": "#/entities/SeniorProfile" },

@@ -61,6 +61,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Phone accounts collection - Secure Phone Number & Unique Code Credentials
+    match /phone_accounts/{phoneId} {
+      allow read: if true;
+      allow create: if isValidId(phoneId) &&
+        incoming().phone is string && incoming().phone.size() <= 30 &&
+        incoming().codeHash is string && incoming().codeHash.size() == 64 &&
+        !exists(/databases/$(database)/documents/phone_accounts/$(phoneId));
+      allow update: if isValidId(phoneId) &&
+        incoming().phone == existing().phone &&
+        incoming().codeHash == existing().codeHash;
+      allow delete: if isAdmin();
+    }
+
     // Senior Profiles collection - PUBLIC EMERGENCY IDENTIFICATION ACCESS
     match /senior_profiles/{profileId} {
       // Emergency QR profiles can be fetched by ID or queried by safeScanId without login
