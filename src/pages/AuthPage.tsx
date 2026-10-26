@@ -23,6 +23,7 @@ import {
   Clock,
   Copy,
 } from 'lucide-react';
+import { registerPhoneWithCode, loginPhoneWithCode } from '../services/phoneAuthService';
 
 // Common country dialing codes for emergency responders & international families
 const COUNTRY_CODES = [
@@ -198,26 +199,17 @@ export const AuthPage: React.FC<{ navigate: (path: string) => void }> = ({ navig
       setLoading(true);
       setLoadingText('Registering phone & generating your unique code...');
 
-      const resp = await fetch('/api/auth/phone/register-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber: fullPhone,
-          name: phoneRegisterName.trim() || undefined,
-          role: selectedRole,
-        }),
+      const result = await registerPhoneWithCode({
+        phoneNumber: fullPhone,
+        name: phoneRegisterName.trim() || undefined,
+        role: selectedRole,
       });
-
-      const data = await resp.json();
-      if (!resp.ok) {
-        throw new Error(data.error || 'Failed to register phone number.');
-      }
 
       // Display assigned unique code
       setAssignedCodeModal({
         phone: fullPhone,
-        code: data.uniqueCode,
-        user: data.user,
+        code: result.uniqueCode,
+        user: result.user,
       });
 
       setSuccessMessage('Registration successful! Please save your unique code.');
@@ -251,22 +243,13 @@ export const AuthPage: React.FC<{ navigate: (path: string) => void }> = ({ navig
       setLoading(true);
       setLoadingText('Authenticating with unique code...');
 
-      const resp = await fetch('/api/auth/phone/login-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber: fullPhone,
-          uniqueCode: cleanCode,
-          role: selectedRole,
-        }),
+      const result = await loginPhoneWithCode({
+        phoneNumber: fullPhone,
+        uniqueCode: cleanCode,
+        role: selectedRole,
       });
 
-      const data = await resp.json();
-      if (!resp.ok) {
-        throw new Error(data.error || 'Failed to log in with unique code.');
-      }
-
-      loginWithCustomUser(data.user);
+      loginWithCustomUser(result.user);
       setSuccessMessage('Login successful! Redirecting...');
 
       if (selectedRole === 'admin') {

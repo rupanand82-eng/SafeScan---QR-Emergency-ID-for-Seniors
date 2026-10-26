@@ -18,15 +18,29 @@ import {
   where,
 } from 'firebase/firestore';
 import fs from 'fs';
+import defaultFirebaseConfig from './firebase-applet-config.json';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const firebaseConfig = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, 'firebase-applet-config.json'), 'utf-8')
-);
+let firebaseConfig: any = defaultFirebaseConfig;
+try {
+  const possiblePaths = [
+    path.resolve(process.cwd(), 'firebase-applet-config.json'),
+    path.resolve(__dirname, 'firebase-applet-config.json'),
+    path.resolve(__dirname, '../firebase-applet-config.json'),
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      firebaseConfig = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      break;
+    }
+  }
+} catch {
+  // Gracefully fall back to bundled defaultFirebaseConfig
+}
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));
@@ -213,8 +227,12 @@ async function runSafeDatabaseMigration(): Promise<{
   return { totalInspected, backfilledRegistryCount, legacyPreservedCount };
 }
 
-// Run safe migration on server startup
-runSafeDatabaseMigration();
+// Run safe migration in non-production local development
+if (process.env.VERCEL !== '1' && process.env.NODE_ENV !== 'production') {
+  runSafeDatabaseMigration().catch((err) => {
+    console.warn('Safe migration check notice:', err);
+  });
+}
 
 // ============================================================================
 // UNIQUE SENIOR REGISTRATION & DUPLICATE PREVENTION API ROUTES
@@ -915,7 +933,7 @@ function generateUniquePhoneCode(): string {
  * Registers a new phone number without SMS OTP, guarantees no duplicates,
  * generates a permanent unique code, and saves credentials securely in Firestore.
  */
-app.post('/api/auth/phone/register-code', async (req, res) => {
+app.post(['/api/auth/phone/register-code', '/auth/phone/register-code'], async (req, res) => {
   try {
     const { phoneNumber, name, role = 'user' } = req.body || {};
     if (!phoneNumber || typeof phoneNumber !== 'string') {
@@ -995,7 +1013,7 @@ app.post('/api/auth/phone/register-code', async (req, res) => {
  * POST /api/auth/phone/login-code
  * Logs in using phone number and assigned unique code without SMS verification.
  */
-app.post('/api/auth/phone/login-code', async (req, res) => {
+app.post(['/api/auth/phone/login-code', '/auth/phone/login-code'], async (req, res) => {
   try {
     const { phoneNumber, uniqueCode, role = 'user' } = req.body || {};
     if (!phoneNumber || typeof phoneNumber !== 'string') {
@@ -1070,7 +1088,7 @@ app.post('/api/auth/phone/login-code', async (req, res) => {
  * POST /api/auth/phone/send-otp
  * Dispatches a dynamic, cryptographically secure 6-digit real-time OTP.
  */
-app.post('/api/auth/phone/send-otp', async (req, res) => {
+app.post(['/api/auth/phone/send-otp', '/auth/phone/send-otp'], async (req, res) => {
   try {
     const { phoneNumber, role = 'user' } = req.body || {};
     if (!phoneNumber || typeof phoneNumber !== 'string') {
@@ -1127,7 +1145,7 @@ app.post('/api/auth/phone/send-otp', async (req, res) => {
  * POST /api/auth/phone/verify-otp
  * Verifies the 6-digit real-time OTP cryptographically with attempt limiting.
  */
-app.post('/api/auth/phone/verify-otp', async (req, res) => {
+app.post(['/api/auth/phone/verify-otp', '/auth/phone/verify-otp'], async (req, res) => {
   try {
     const { phoneNumber, code, role = 'user' } = req.body || {};
     if (!phoneNumber || !code) {
@@ -1220,6 +1238,14 @@ async function startServer() {
     console.log(`SafeScan full-stack server running on http://0.0.0.0:${PORT}`);
   });
 }
+
+// Fallback error handler to guarantee valid JSON responses
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.warn('Server error handler:', err?.message || err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: err?.message || 'A server error occurred.' });
+  }
+});
 
 export default app;
 
