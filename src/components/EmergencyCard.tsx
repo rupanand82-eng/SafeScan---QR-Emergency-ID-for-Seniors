@@ -104,11 +104,7 @@ export const EmergencyCard: React.FC<EmergencyCardProps> = ({ senior, onClose })
                     alt={senior.fullName}
                     className="w-full h-full object-cover"
                   />
-                ) : (
-                  <div className="text-2xl font-bold text-slate-400">
-                    {senior.fullName.charAt(0)}
-                  </div>
-                )}
+                ) : null}
               </div>
               <div className="mt-1.5 w-full text-center">
                 <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">Blood Group</span>

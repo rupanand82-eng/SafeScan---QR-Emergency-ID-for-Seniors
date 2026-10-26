@@ -353,9 +353,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
                     alt={profile.fullName}
                     className="w-full h-full object-cover"
                   />
-                ) : (
-                  <User className="w-14 h-14 text-slate-400" />
-                )}
+                ) : null}
               </div>
               <div className="absolute -bottom-2 -right-2 bg-red-600 text-white font-black text-sm px-2.5 py-1 rounded-lg shadow-md border-2 border-white">
                 {profile.bloodGroup}

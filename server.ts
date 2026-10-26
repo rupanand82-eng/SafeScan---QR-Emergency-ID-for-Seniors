@@ -334,9 +334,7 @@ app.post(['/api/seniors/register', '/api/members/register'], async (req, res) =>
           dateOfBirth: dateOfBirth || '',
           age: Number(age) || 68,
           gender: gender || 'Male',
-          photoUrl:
-            photoUrl ||
-            'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400',
+          photoUrl: (photoUrl || '').trim(),
           bloodGroup: bloodGroup.trim().slice(0, 10),
           phone: (phone || '').trim().slice(0, 20),
           address: (address || '').trim().slice(0, 250),
@@ -515,7 +513,7 @@ app.put(['/api/seniors/:id', '/api/members/:id'], async (req, res) => {
       dateOfBirth: dateOfBirth ?? existing.dateOfBirth ?? '',
       age: Number(age ?? existing.age) || 68,
       gender: gender ?? existing.gender ?? 'Male',
-      photoUrl: photoUrl ?? existing.photoUrl ?? '',
+      photoUrl: photoUrl !== undefined ? String(photoUrl).trim() : (existing.photoUrl ?? ''),
       bloodGroup: (bloodGroup ?? existing.bloodGroup ?? 'O+').trim().slice(0, 10),
       phone: (phone ?? existing.phone ?? '').trim().slice(0, 20),
       address: (address ?? existing.address ?? '').trim().slice(0, 250),

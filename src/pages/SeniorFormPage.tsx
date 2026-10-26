@@ -403,9 +403,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
         dateOfBirth,
         age: numAge,
         gender,
-        photoUrl:
-          photoUrl ||
-          'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400',
+        photoUrl: photoUrl.trim(),
         bloodGroup,
         phone: phone.trim(),
         address: address.trim(),
@@ -857,16 +855,14 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
 
                 <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row items-center gap-4">
                   {/* Live Photo Preview */}
-                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-white border-2 border-slate-200 shadow-sm flex items-center justify-center flex-shrink-0">
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 border-2 border-slate-200 shadow-sm flex items-center justify-center flex-shrink-0">
                     {photoUrl ? (
                       <img
                         src={photoUrl}
                         alt="Member Preview"
                         className="w-full h-full object-cover"
                       />
-                    ) : (
-                      <User className="w-9 h-9 text-slate-300" />
-                    )}
+                    ) : null}
                     {photoUploading && (
                       <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

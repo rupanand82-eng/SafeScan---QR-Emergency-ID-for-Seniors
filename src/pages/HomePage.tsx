@@ -188,11 +188,10 @@ export const HomePage: React.FC<{ navigate: (path: string) => void }> = ({ navig
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-center">
           {[
             { icon: '👨‍👩‍👧‍👦', label: 'Family Members', desc: 'Children & adults' },
             { icon: '👵', label: 'Senior Citizens', desc: 'Vulnerable elders' },
-            { icon: '🧑‍⚕️', label: 'Caregivers', desc: 'Profile managers' },
             { icon: '🤝', label: 'Volunteers', desc: 'Good Samaritans' },
             { icon: '🏥', label: 'Hospitals & EMTs', desc: 'Accident casualty' },
             { icon: '👮', label: 'Police & Helplines', desc: 'Missing reuniting' },

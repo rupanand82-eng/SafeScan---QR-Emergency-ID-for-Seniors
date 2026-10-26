@@ -358,9 +358,7 @@ export const DashboardPage: React.FC<{ navigate: (path: string) => void }> = ({ 
                       <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
                         {senior.photoUrl ? (
                           <img src={senior.photoUrl} alt={senior.fullName} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="font-bold text-slate-400 text-lg">{senior.fullName.charAt(0)}</span>
-                        )}
+                        ) : null}
                       </div>
                       <span className="absolute -bottom-1 -right-1 bg-red-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded shadow">
                         {senior.bloodGroup}
