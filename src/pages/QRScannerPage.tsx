@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { QrCode, Camera, AlertCircle, ArrowRight, RefreshCw, Upload, Image as ImageIcon } from 'lucide-react';
 import { extractSafeScanId } from '../services/seniorService';
+import { decodeQrFromImageFile } from '../utils/qrScannerHelper';
 
 export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const [manualCode, setManualCode] = useState('');
@@ -13,7 +14,6 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const scannerElementId = 'safescan-qr-reader';
-  const fileScannerElementId = 'safescan-qr-file-reader';
 
   useEffect(() => {
     let isMounted = true;
@@ -114,19 +114,10 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
     setScanningFile(true);
 
     try {
-      // Stop live camera first if running so Html5Qrcode can scan file cleanly
-      if (scannerRef.current && isScanning) {
-        try {
-          await scannerRef.current.stop();
-          setIsScanning(false);
-        } catch {}
+      const decodedText = await decodeQrFromImageFile(file);
+      if (!decodedText || !decodedText.trim()) {
+        throw new Error('Empty QR payload');
       }
-
-      const fileScanner = new Html5Qrcode(fileScannerElementId);
-      const decodedText = await fileScanner.scanFile(file, false);
-      try {
-        fileScanner.clear();
-      } catch {}
       handleScannedText(decodedText);
     } catch (err) {
       console.warn('QR image scan failed:', err);
@@ -200,8 +191,6 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
           </div>
         )}
 
-        {/* Hidden element for file scanning */}
-        <div id={fileScannerElementId} className="hidden" />
 
         {/* Video Scanner Container */}
         <div className="relative rounded-3xl overflow-hidden bg-black border-2 border-slate-700 shadow-2xl p-2 aspect-square flex flex-col items-center justify-center">

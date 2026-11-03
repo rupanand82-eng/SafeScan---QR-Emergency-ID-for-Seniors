@@ -16,10 +16,10 @@ export function generateSafeScanId(): string {
 export async function generateQrDataUrl(text: string): Promise<string> {
   try {
     return await QRCode.toDataURL(text, {
-      width: 420,
-      margin: 2,
+      width: 512,
+      margin: 4,
       color: {
-        dark: '#0f172a',
+        dark: '#000000',
         light: '#ffffff',
       },
       errorCorrectionLevel: 'M',
