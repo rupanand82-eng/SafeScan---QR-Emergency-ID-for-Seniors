@@ -67,7 +67,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
         setError(null);
 
         if (!patientId) {
-          setError('Invalid Patient ID in QR code.');
+          setError('Invalid ID in QR code.');
           setLoading(false);
           return;
         }
@@ -253,7 +253,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
         <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4" />
         <h2 className="text-2xl font-black tracking-tight">Loading Emergency Profile...</h2>
         <p className="text-xs text-slate-400 mt-2 max-w-sm">
-          Extracting Patient ID <code className="text-red-400 font-mono font-bold">{patientId}</code> and querying database...
+          Extracting ID <code className="text-red-400 font-mono font-bold">{patientId}</code> and querying database...
         </p>
       </div>
     );
@@ -275,7 +275,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
 
           <div className="space-y-1">
             <h2 className="text-2xl font-black text-slate-900">
-              {isNotFound ? 'Patient Not Found' : 'Unable to Retrieve Profile'}
+              {isNotFound ? 'Profile Not Found' : 'Unable to Retrieve Profile'}
             </h2>
             <p className="text-xs text-slate-500 font-mono">
               Scanned ID: <span className="font-bold text-slate-700">{patientId || 'None'}</span>
@@ -340,11 +340,16 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
 
       <main className="max-w-3xl mx-auto px-4 pt-6 space-y-5">
 
-        {/* 1. EMERGENCY IDENTITY CARD: Name, Age, Blood Group */}
+        {/* 1. PERSONAL DETAILS / EMERGENCY IDENTITY CARD */}
         <div className="bg-white rounded-3xl shadow-md border-2 border-slate-200 p-6 sm:p-7 relative overflow-hidden">
+          <div className="flex items-center gap-2 mb-4 pb-2.5 border-b border-slate-100">
+            <User className="w-5 h-5 text-blue-600" />
+            <h2 className="text-base font-black text-slate-900 tracking-tight">Personal Details</h2>
+          </div>
+
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
             
-            {/* Senior Photo */}
+            {/* Photo */}
             <div className="relative flex-shrink-0">
               <div className="w-28 h-28 rounded-2xl overflow-hidden bg-slate-100 border-2 border-slate-300 shadow-md flex items-center justify-center">
                 {vis.showPhoto && profile.photoUrl ? (
@@ -360,11 +365,11 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
               </div>
             </div>
 
-            {/* Core Patient Details */}
+            {/* Core Personal Details */}
             <div className="flex-1 text-center sm:text-left space-y-1.5">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                  Patient ID: {displayPatientId}
+                  Personal ID: {displayPatientId}
                 </span>
                 <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
                   <CheckCircle className="w-3 h-3" /> SafeScan Verified
@@ -504,7 +509,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
 2. Call 112 if the situation is serious.
 3. Do not give food, water, or medicine to an unconscious person.
 4. Keep the person safe and avoid unnecessary movement.
-5. Inform medical professionals about the patient's known conditions and medications.
+5. Inform medical professionals about known personal conditions and medications.
 6. Stay with the person until medical help arrives.`
               )}
             </div>
@@ -606,7 +611,7 @@ export const EmergencyProfilePage: React.FC<EmergencyProfilePageProps> = ({ seni
             "This system is intended for emergency identification and assistance. It does not replace professional medical services."
           </p>
           <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400 font-mono">
-            <span>Patient ID: {displayPatientId}</span>
+            <span>Personal ID: {displayPatientId}</span>
             <span>Database Status: ACTIVE</span>
           </div>
         </div>

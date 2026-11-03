@@ -205,7 +205,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
 2. Call 112 if the situation is serious.
 3. Do not give food, water, or medicine to an unconscious person.
 4. Keep the person safe and avoid unnecessary movement.
-5. Inform medical professionals about the patient's known conditions and medications.
+5. Inform medical professionals about known personal conditions and medications.
 6. Stay with the person until medical help arrives.`
         );
       }
@@ -415,7 +415,7 @@ export const SeniorFormPage: React.FC<SeniorFormPageProps> = ({ seniorId, naviga
         medications: medications.trim(),
         emergencyInstructions:
           emergencyInstructions.trim() ||
-          `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about the patient's known conditions and medications.\n6. Stay with the person until medical help arrives.`,
+          `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about known personal conditions and medications.\n6. Stay with the person until medical help arrives.`,
         mobilityAssistance: mobilityAssistance.trim(),
         communicationDifficulties: communicationDifficulties.trim(),
         identificationMarks: identificationMarks.trim(),

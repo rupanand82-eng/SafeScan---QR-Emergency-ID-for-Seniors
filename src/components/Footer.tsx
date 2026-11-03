@@ -97,7 +97,7 @@ export const Footer: React.FC<{ navigate: (path: string) => void }> = ({ navigat
           <div>
             <h5 className="text-white text-xs font-bold uppercase tracking-wider mb-3">Community Service</h5>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Designed as a social safety initiative for family members, children, vulnerable seniors, Alzheimer's patients, and high-risk medical individuals.
+              Designed as a social safety initiative for family members, children, vulnerable seniors, individuals with Alzheimer's, and high-risk medical conditions.
             </p>
             <div className="mt-3 p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-[11px] text-slate-300">
               <span className="font-bold text-white block">Print formats:</span>

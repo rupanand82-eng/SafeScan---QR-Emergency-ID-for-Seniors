@@ -18,14 +18,26 @@ import {
   where,
 } from 'firebase/firestore';
 import fs from 'fs';
-import defaultFirebaseConfig from './firebase-applet-config.json';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let firebaseConfig: any = defaultFirebaseConfig;
+const fallbackFirebaseConfig = {
+  projectId: 'carbide-cycle-6ln7n',
+  appId: '1:439021657162:web:5aeff12ce49e0c6224dab3',
+  apiKey: 'AIzaSyCQaIMgy72RFEWhdrkseXNmYDffhGC9jWM',
+  authDomain: 'carbide-cycle-6ln7n.firebaseapp.com',
+  firestoreDatabaseId: 'ai-studio-remixsafescanqre-e2c3b1f7-b39a-4a82-ad31-33bc727bca3f',
+  storageBucket: 'carbide-cycle-6ln7n.firebasestorage.app',
+  messagingSenderId: '439021657162',
+  measurementId: '',
+  oAuthClientId: '439021657162-pavu8tqufdhssvnmai5dsvq76voi05n5.apps.googleusercontent.com',
+  recaptchaSiteKey: '',
+};
+
+let firebaseConfig: any = fallbackFirebaseConfig;
 try {
   const possiblePaths = [
     path.resolve(process.cwd(), 'firebase-applet-config.json'),
@@ -39,7 +51,7 @@ try {
     }
   }
 } catch {
-  // Gracefully fall back to bundled defaultFirebaseConfig
+  // Gracefully fall back to bundled fallbackFirebaseConfig
 }
 
 const app = express();
@@ -364,7 +376,7 @@ app.post(['/api/seniors/register', '/api/members/register'], async (req, res) =>
           medications: (medications || '').trim().slice(0, 1000),
           emergencyInstructions:
             (emergencyInstructions || '').trim().slice(0, 1500) ||
-            `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about the patient's known conditions and medications.\n6. Stay with the person until medical help arrives.`,
+            `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about known personal conditions and medications.\n6. Stay with the person until medical help arrives.`,
           mobilityAssistance: (mobilityAssistance || '').trim().slice(0, 500),
           communicationDifficulties: (communicationDifficulties || '').trim().slice(0, 500),
           identificationMarks: (identificationMarks || '').trim().slice(0, 500),
@@ -1215,9 +1227,35 @@ app.post(['/api/auth/phone/verify-otp', '/auth/phone/verify-otp'], async (req, r
   }
 });
 
+// Health check endpoints for Cloud Run container probes
+app.get(['/healthz', '/api/health'], (_req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // Setup Vite middleware in dev or static files in production
-const isProduction = process.env.NODE_ENV === 'production';
-const PORT = Number(process.env.PORT) || 3000;
+function determineIsProduction(): boolean {
+  if (process.env.NODE_ENV === 'production') return true;
+  if (process.env.K_SERVICE || process.env.K_REVISION || process.env.CLOUD_RUN_JOB) return true;
+  const hasDist = fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
+  const isDevArg = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+  return hasDist && !isDevArg;
+}
+
+function getPort(): number {
+  const portIndex = process.argv.indexOf('--port');
+  if (portIndex !== -1 && process.argv[portIndex + 1]) {
+    const val = parseInt(process.argv[portIndex + 1], 10);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  if (process.env.PORT) {
+    const val = parseInt(process.env.PORT, 10);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  return 3000;
+}
+
+const isProduction = determineIsProduction();
+const PORT = getPort();
 
 async function startServer() {
   if (!isProduction) {
@@ -1228,24 +1266,30 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    const distPath = path.resolve(__dirname, 'dist');
+    const indexPath = path.resolve(distPath, 'index.html');
+    app.use(express.static(distPath));
     app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('Not Found');
+      }
     });
   }
 
+  // Fallback error handler to guarantee valid JSON responses
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.warn('Server error handler:', err?.message || err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err?.message || 'A server error occurred.' });
+    }
+  });
+
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`SafeScan full-stack server running on http://0.0.0.0:${PORT}`);
+    console.log(`SafeScan full-stack server running on http://0.0.0.0:${PORT} (mode: ${isProduction ? 'production' : 'development'})`);
   });
 }
-
-// Fallback error handler to guarantee valid JSON responses
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.warn('Server error handler:', err?.message || err);
-  if (!res.headersSent) {
-    res.status(500).json({ error: err?.message || 'A server error occurred.' });
-  }
-});
 
 export default app;
 

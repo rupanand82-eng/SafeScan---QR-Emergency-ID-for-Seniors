@@ -718,7 +718,7 @@ export async function registerUniqueSeniorProfileDirect(
       medications: (medications || '').trim().slice(0, 1000),
       emergencyInstructions:
         (emergencyInstructions || '').trim().slice(0, 1500) ||
-        `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about the patient's known conditions and medications.\n6. Stay with the person until medical help arrives.`,
+        `1. Check whether the person is conscious and breathing normally.\n2. Call 112 if the situation is serious.\n3. Do not give food, water, or medicine to an unconscious person.\n4. Keep the person safe and avoid unnecessary movement.\n5. Inform medical professionals about known personal conditions and medications.\n6. Stay with the person until medical help arrives.`,
       mobilityAssistance: (mobilityAssistance || '').trim().slice(0, 500),
       communicationDifficulties: (communicationDifficulties || '').trim().slice(0, 500),
       identificationMarks: (identificationMarks || '').trim().slice(0, 500),
