@@ -1,8 +1,43 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { QrCode, Camera, AlertCircle, ArrowRight, RefreshCw, Upload, Image as ImageIcon } from 'lucide-react';
 import { extractSafeScanId } from '../services/seniorService';
 import { decodeQrFromImageFile } from '../utils/qrScannerHelper';
+
+/**
+ * Safely stops and clears an Html5Qrcode instance without throwing
+ * "Cannot stop, scanner is not running or paused." or unhandled promise rejection.
+ */
+async function safeStopScanner(scanner: Html5Qrcode | null): Promise<void> {
+  if (!scanner) return;
+  try {
+    let canStop = false;
+    try {
+      const state = scanner.getState();
+      if (
+        state === Html5QrcodeScannerState.SCANNING ||
+        state === Html5QrcodeScannerState.PAUSED
+      ) {
+        canStop = true;
+      }
+    } catch {
+      canStop = Boolean(scanner.isScanning);
+    }
+
+    if (canStop) {
+      await scanner.stop();
+    }
+  } catch (err) {
+    // Gracefully handle any race condition or non-running state errors
+    console.warn('Safe scanner stop notice:', err);
+  } finally {
+    try {
+      scanner.clear();
+    } catch {
+      // Ignore clear errors
+    }
+  }
+}
 
 export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const [manualCode, setManualCode] = useState('');
@@ -12,16 +47,20 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
   const [scanningFile, setScanningFile] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isNavigatingRef = useRef(false);
 
   const scannerElementId = 'safescan-qr-reader';
 
   useEffect(() => {
     let isMounted = true;
+    let startPromise: Promise<any> | null = null;
+    let activeScanner: Html5Qrcode | null = null;
 
     async function startScanner() {
       try {
         const html5QrCode = new Html5Qrcode(scannerElementId);
         scannerRef.current = html5QrCode;
+        activeScanner = html5QrCode;
 
         const config = {
           fps: 10,
@@ -29,7 +68,7 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
           aspectRatio: 1.0,
         };
 
-        await html5QrCode.start(
+        startPromise = html5QrCode.start(
           { facingMode: 'environment' }, // Prefer back camera
           config,
           (decodedText) => {
@@ -41,18 +80,23 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
           }
         );
 
-        if (isMounted) {
-          setIsScanning(true);
-          setCameraError(null);
+        await startPromise;
+
+        if (!isMounted) {
+          // If component unmounted while starting, stop it safely
+          await safeStopScanner(html5QrCode);
+          return;
         }
+
+        setIsScanning(true);
+        setCameraError(null);
       } catch (err: any) {
+        if (!isMounted) return;
         console.warn('Camera scanner initialization failed:', err);
-        if (isMounted) {
-          setCameraError(
-            'Unable to start camera scanner. You can upload a QR code image from your media files or enter the SafeScan ID below.'
-          );
-          setIsScanning(false);
-        }
+        setCameraError(
+          'Unable to start camera scanner. You can upload a QR code image from your media files or enter the SafeScan ID below.'
+        );
+        setIsScanning(false);
       }
     }
 
@@ -60,22 +104,28 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
 
     return () => {
       isMounted = false;
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .catch(() => {})
-          .finally(() => {
-            try {
-              scannerRef.current?.clear();
-            } catch {}
-          });
+      const scanner = scannerRef.current || activeScanner;
+      scannerRef.current = null;
+      if (scanner) {
+        if (startPromise) {
+          startPromise
+            .catch(() => {})
+            .finally(() => {
+              safeStopScanner(scanner);
+            });
+        } else {
+          safeStopScanner(scanner);
+        }
       }
     };
   }, []);
 
-  const handleScannedText = (text: string) => {
+  const handleScannedText = async (text: string) => {
     const raw = text.trim();
     if (!raw) return;
+
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
 
     // Extract the SafeScan ID (e.g. SAFE-0AIK13 or SS-1001)
     const safeScanId = extractSafeScanId(raw);
@@ -96,14 +146,16 @@ export const QRScannerPage: React.FC<{ navigate: (path: string) => void }> = ({ 
       // AudioContext unavailable
     }
 
-    // Stop camera before navigating
-    if (scannerRef.current && isScanning) {
-      scannerRef.current.stop().catch(() => {}).finally(() => {
-        navigate(`/emergency/${targetId}`);
-      });
-    } else {
-      navigate(`/emergency/${targetId}`);
-    }
+    // Stop scanner safely before navigating
+    const scanner = scannerRef.current;
+    scannerRef.current = null;
+    setIsScanning(false);
+
+    try {
+      await safeStopScanner(scanner);
+    } catch {}
+
+    navigate(`/emergency/${targetId}`);
   };
 
   const handleQrFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
